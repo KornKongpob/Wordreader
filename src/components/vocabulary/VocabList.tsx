@@ -29,6 +29,10 @@ export default function VocabList() {
   useEffect(() => {
     const fetchVocab = async () => {
       const supabase = createClient();
+      if (!supabase) {
+        setLoading(false);
+        return;
+      }
       const {
         data: { user },
       } = await supabase.auth.getUser();

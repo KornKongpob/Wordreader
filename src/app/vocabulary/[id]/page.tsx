@@ -58,6 +58,10 @@ export default function VocabularyDetailPage() {
   useEffect(() => {
     const fetchDetail = async () => {
       const supabase = createClient();
+      if (!supabase) {
+        setLoading(false);
+        return;
+      }
 
       // Fetch vocabulary item
       const { data: vocabData } = await supabase
@@ -128,6 +132,7 @@ export default function VocabularyDetailPage() {
     setDeleting(true);
 
     const supabase = createClient();
+    if (!supabase) return;
     await supabase.from("vocabulary_items").delete().eq("id", id);
 
     router.push("/vocabulary");

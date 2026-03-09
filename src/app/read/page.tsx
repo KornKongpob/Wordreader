@@ -35,6 +35,11 @@ export default function ReadPage() {
 
       // Save article to Supabase
       const supabase = createClient();
+      if (!supabase) {
+        setError("Supabase is not configured. Check environment variables.");
+        setLoading(false);
+        return;
+      }
       const article = data.article;
 
       // Check if article already exists

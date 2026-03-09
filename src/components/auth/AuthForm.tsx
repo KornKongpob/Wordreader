@@ -15,13 +15,19 @@ export default function AuthForm() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const router = useRouter();
-  const supabase = createClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     setMessage(null);
+
+    const supabase = createClient();
+    if (!supabase) {
+      setError("Supabase is not configured. Please check environment variables on Vercel.");
+      setLoading(false);
+      return;
+    }
 
     if (mode === "signup") {
       const { error } = await supabase.auth.signUp({

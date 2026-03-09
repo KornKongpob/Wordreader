@@ -74,6 +74,11 @@ export default function VocabPopup({
 
     try {
       const supabase = createClient();
+      if (!supabase) {
+        setError("Supabase is not configured.");
+        setSaving(false);
+        return;
+      }
       const {
         data: { user },
       } = await supabase.auth.getUser();

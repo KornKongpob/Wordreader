@@ -31,6 +31,10 @@ export default function ReviewPage() {
   useEffect(() => {
     const fetchDueCards = async () => {
       const supabase = createClient();
+      if (!supabase) {
+        setLoading(false);
+        return;
+      }
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -102,6 +106,7 @@ export default function ReviewPage() {
     if (!card) return;
 
     const supabase = createClient();
+    if (!supabase) return;
     const {
       data: { user },
     } = await supabase.auth.getUser();

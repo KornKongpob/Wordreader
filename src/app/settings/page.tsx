@@ -35,6 +35,7 @@ export default function SettingsPage() {
     // Load user stats
     const loadStats = async () => {
       const supabase = createClient();
+      if (!supabase) return;
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -71,6 +72,7 @@ export default function SettingsPage() {
 
   const handleSignOut = async () => {
     const supabase = createClient();
+    if (!supabase) return;
     await supabase.auth.signOut();
     router.push("/auth");
     router.refresh();
