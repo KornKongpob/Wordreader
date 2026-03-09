@@ -1,6 +1,18 @@
 -- WordReader Database Schema
 -- Run this in your Supabase SQL Editor (Dashboard > SQL Editor > New Query)
 
+-- ─── Clean up existing tables (safe to re-run) ───
+drop trigger if exists on_auth_user_created on auth.users;
+drop function if exists public.handle_new_user();
+drop table if exists public.user_settings cascade;
+drop table if exists public.review_events cascade;
+drop table if exists public.review_states cascade;
+drop table if exists public.vocabulary_contexts cascade;
+drop table if exists public.vocabulary_items cascade;
+drop table if exists public.reading_history cascade;
+drop table if exists public.articles cascade;
+drop table if exists public.profiles cascade;
+
 -- ─── Profiles ───
 create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
