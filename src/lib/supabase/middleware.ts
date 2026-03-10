@@ -10,9 +10,11 @@ export async function updateSession(request: NextRequest) {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   // If Supabase is not configured, allow access to auth page only
+  const isOfflineReadPage = request.nextUrl.pathname.startsWith("/read/offline");
+
   if (!supabaseUrl || !supabaseAnonKey) {
     const isAuthPage = request.nextUrl.pathname.startsWith("/auth");
-    if (!isAuthPage) {
+    if (!isAuthPage && !isOfflineReadPage) {
       const url = request.nextUrl.clone();
       url.pathname = "/auth";
       return NextResponse.redirect(url);
@@ -50,7 +52,7 @@ export async function updateSession(request: NextRequest) {
 
   // If not signed in and trying to access protected routes, redirect to /auth
   const isAuthPage = request.nextUrl.pathname.startsWith("/auth");
-  if (!user && !isAuthPage) {
+  if (!user && !isAuthPage && !isOfflineReadPage) {
     const url = request.nextUrl.clone();
     url.pathname = "/auth";
     return NextResponse.redirect(url);

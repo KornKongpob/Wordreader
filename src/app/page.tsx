@@ -1,9 +1,92 @@
 import AppShell from "@/components/layout/AppShell";
+import OnboardingChecklist from "@/components/home/OnboardingChecklist";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import { BookOpen, Library, RotateCcw } from "lucide-react";
+import {
+  BookOpen,
+  BookOpenText,
+  Flame,
+  Library,
+  RotateCcw,
+  Sparkles,
+} from "lucide-react";
 
 export const dynamic = "force-dynamic";
+
+interface ReadingHistoryWithArticle {
+  article_id: string;
+  updated_at?: string;
+  last_position?: number;
+  is_finished?: boolean;
+  articles?:
+    | {
+        id: string;
+        title: string;
+        source_name: string;
+        image_url: string | null;
+      }
+    | {
+        id: string;
+        title: string;
+        source_name: string;
+        image_url: string | null;
+      }[]
+    | null;
+}
+
+function getStartOfToday() {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return now;
+}
+
+function calculateStreak(reviewedAt: string[]) {
+  const uniqueDays = [...new Set(reviewedAt.map((value) => value.slice(0, 10)))].sort(
+    (a, b) => b.localeCompare(a)
+  );
+
+  if (uniqueDays.length === 0) return 0;
+
+  let streak = 0;
+  const cursor = new Date();
+  cursor.setHours(0, 0, 0, 0);
+
+  for (const day of uniqueDays) {
+    const cursorLabel = cursor.toISOString().slice(0, 10);
+    if (day !== cursorLabel) {
+      if (streak === 0) {
+        cursor.setDate(cursor.getDate() - 1);
+        if (day !== cursor.toISOString().slice(0, 10)) {
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  return streak;
+}
+
+function formatRelativeTime(value?: string) {
+  if (!value) return "Just now";
+
+  const diffMs = Date.now() - new Date(value).getTime();
+  const diffHours = Math.round(diffMs / (1000 * 60 * 60));
+
+  if (diffHours < 1) return "Updated just now";
+  if (diffHours < 24) return `Updated ${diffHours}h ago`;
+
+  const diffDays = Math.round(diffHours / 24);
+  return `Updated ${diffDays}d ago`;
+}
+
+function getArticleMeta(entry: ReadingHistoryWithArticle) {
+  return Array.isArray(entry.articles) ? entry.articles[0] : entry.articles;
+}
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -11,66 +94,227 @@ export default async function HomePage() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  if (!user) {
+    return (
+      <AppShell>
+        <div className="mx-auto max-w-lg px-5 py-6">
+          <p className="text-sm text-muted">Loading your dashboard...</p>
+        </div>
+      </AppShell>
+    );
+  }
+
+  const startOfToday = getStartOfToday().toISOString();
+
+  const [
+    { data: settings },
+    { count: dueCount },
+    { count: reviewedToday },
+    { count: vocabCount },
+    { data: reviewEventDays },
+    { data: readingHistory },
+  ] = await Promise.all([
+    supabase
+      .from("user_settings")
+      .select("review_goal, onboarding_completed")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("review_states")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .lte("next_review_at", new Date().toISOString()),
+    supabase
+      .from("review_events")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .gte("reviewed_at", startOfToday),
+    supabase
+      .from("vocabulary_items")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id),
+    supabase
+      .from("review_events")
+      .select("reviewed_at")
+      .eq("user_id", user.id)
+      .order("reviewed_at", { ascending: false })
+      .limit(45),
+    supabase
+      .from("reading_history")
+      .select("article_id, updated_at, last_position, is_finished, articles(id, title, source_name, image_url)")
+      .eq("user_id", user.id)
+      .order("updated_at", { ascending: false })
+      .limit(8),
+  ]);
+
+  const uniqueHistory = new Map<string, ReadingHistoryWithArticle>();
+  for (const row of (readingHistory ?? []) as ReadingHistoryWithArticle[]) {
+    if (!uniqueHistory.has(row.article_id)) {
+      uniqueHistory.set(row.article_id, row);
+    }
+  }
+
+  const recentHistory = [...uniqueHistory.values()];
+  const continueReading = recentHistory.filter((row) => !row.is_finished).slice(0, 3);
+  const distinctArticleCount = recentHistory.length;
+  const streak = calculateStreak((reviewEventDays ?? []).map((event) => event.reviewed_at));
+  const reviewGoal = settings?.review_goal ?? 10;
+  const reviewedCount = reviewedToday ?? 0;
+  const progress = Math.min(100, Math.round((reviewedCount / reviewGoal) * 100));
+
+  const onboardingItems = [
+    { label: "Read your first article", done: distinctArticleCount > 0 },
+    { label: "Save 3 useful words", done: (vocabCount ?? 0) >= 3 },
+    { label: "Finish your first review session", done: streak > 0 || reviewedCount > 0 },
+  ];
+
+  const firstName = user?.email ? user.email.split("@")[0] : "reader";
+
   return (
     <AppShell>
-      <div className="px-5 py-6 max-w-lg mx-auto">
-        {/* Greeting */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold">
-            Hello{user?.email ? `, ${user.email.split("@")[0]}` : ""} 👋
+      <div className="mx-auto max-w-lg px-5 py-6">
+        <section className="mb-6 rounded-[2rem] bg-[linear-gradient(135deg,rgba(37,99,235,0.16),rgba(14,165,233,0.08),rgba(255,255,255,0.02))] p-6">
+          <div className="mb-4 flex items-center gap-2 text-sm text-primary">
+            <Sparkles size={16} />
+            <span>Daily reading dashboard</span>
+          </div>
+          <h1 className="text-3xl font-bold leading-tight">
+            Hello, {firstName}
           </h1>
-          <p className="text-muted text-sm mt-1">
-            What would you like to do today?
+          <p className="mt-2 text-sm text-muted">
+            You&apos;ve reviewed {reviewedCount}/{reviewGoal} cards today and have{" "}
+            {dueCount ?? 0} waiting next.
           </p>
-        </div>
 
-        {/* Quick actions */}
-        <div className="grid gap-4">
-          <Link
-            href="/read"
-            className="flex items-center gap-4 p-4 rounded-2xl bg-primary text-primary-foreground active:scale-[0.98] transition"
-          >
-            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-              <BookOpen size={24} />
+          <div className="mt-5 rounded-2xl border border-white/20 bg-background/70 p-4">
+            <div className="mb-2 flex items-center justify-between text-sm">
+              <span className="font-medium">Daily review goal</span>
+              <span className="text-muted">{reviewedCount}/{reviewGoal}</span>
             </div>
-            <div>
-              <p className="font-semibold text-lg">Read an Article</p>
-              <p className="text-sm opacity-80">
-                Paste a CNN URL and start reading
+            <div className="h-2 overflow-hidden rounded-full bg-border">
+              <div
+                className="h-full rounded-full bg-primary transition-all"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <div className="mt-3 flex items-center gap-2 text-xs text-muted">
+              <Flame size={14} className="text-warning" />
+              <span>{streak} day streak</span>
+            </div>
+          </div>
+        </section>
+
+        <OnboardingChecklist
+          items={onboardingItems}
+          initiallyDismissed={Boolean(settings?.onboarding_completed)}
+        />
+
+        <section className="mb-6 grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-border bg-card p-4">
+            <p className="text-xs uppercase tracking-wide text-muted">Vocabulary</p>
+            <p className="mt-2 text-2xl font-bold">{vocabCount ?? 0}</p>
+            <p className="mt-1 text-xs text-muted">Saved words ready to revisit</p>
+          </div>
+          <div className="rounded-2xl border border-border bg-card p-4">
+            <p className="text-xs uppercase tracking-wide text-muted">Articles</p>
+            <p className="mt-2 text-2xl font-bold">{distinctArticleCount}</p>
+            <p className="mt-1 text-xs text-muted">Distinct pieces you&apos;ve read</p>
+          </div>
+        </section>
+
+        <section className="mb-6">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-medium uppercase tracking-wide text-muted">
+              Quick actions
+            </h2>
+            <Link href="/settings" className="text-xs font-medium text-primary hover:underline">
+              Tune your setup
+            </Link>
+          </div>
+          <div className="grid gap-3">
+            <Link
+              href="/read"
+              className="flex items-center gap-4 rounded-2xl bg-primary px-4 py-4 text-primary-foreground transition active:scale-[0.98]"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20">
+                <BookOpen size={24} />
+              </div>
+              <div>
+                <p className="font-semibold text-lg">Read something new</p>
+                <p className="text-sm opacity-80">Paste a link or bring your own text</p>
+              </div>
+            </Link>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Link
+                href="/vocabulary"
+                className="rounded-2xl border border-border bg-card p-4 transition active:scale-[0.98]"
+              >
+                <Library size={18} className="mb-3 text-primary" />
+                <p className="font-semibold">Organize words</p>
+                <p className="mt-1 text-xs text-muted">Tags, notes, folders, favorites</p>
+              </Link>
+              <Link
+                href="/review"
+                className="rounded-2xl border border-border bg-card p-4 transition active:scale-[0.98]"
+              >
+                <RotateCcw size={18} className="mb-3 text-primary" />
+                <p className="font-semibold">Review deck</p>
+                <p className="mt-1 text-xs text-muted">Practice due cards and keep streaks alive</p>
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-medium uppercase tracking-wide text-muted">
+              Continue reading
+            </h2>
+            <Link href="/read" className="text-xs font-medium text-primary hover:underline">
+              View library
+            </Link>
+          </div>
+
+          {continueReading.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-card p-5 text-center">
+              <BookOpenText size={22} className="mx-auto mb-3 text-primary" />
+              <p className="font-medium">No article in progress yet</p>
+              <p className="mt-1 text-sm text-muted">
+                Start reading and WordReader will keep your place for you.
               </p>
             </div>
-          </Link>
+          ) : (
+            <div className="space-y-3">
+              {continueReading.map((entry) => {
+                const articleMeta = getArticleMeta(entry);
 
-          <Link
-            href="/vocabulary"
-            className="flex items-center gap-4 p-4 rounded-2xl border border-border bg-card active:scale-[0.98] transition"
-          >
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Library size={24} className="text-primary" />
+                return (
+                  <Link
+                    key={entry.article_id}
+                    href={`/read/${entry.article_id}`}
+                    className="flex items-start justify-between gap-3 rounded-2xl border border-border bg-card p-4 transition active:scale-[0.98]"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs uppercase tracking-wide text-primary">
+                        {articleMeta?.source_name ?? "Article"}
+                      </p>
+                      <p className="mt-1 font-semibold leading-snug">
+                        {articleMeta?.title ?? "Untitled article"}
+                      </p>
+                      <p className="mt-2 text-xs text-muted">
+                        {formatRelativeTime(entry.updated_at)}
+                      </p>
+                    </div>
+                    <div className="rounded-full border border-border px-3 py-1 text-xs text-muted">
+                      {entry.last_position && entry.last_position > 0 ? "Resume" : "Open"}
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
-            <div>
-              <p className="font-semibold">My Vocabulary</p>
-              <p className="text-sm text-muted">
-                Browse your saved words
-              </p>
-            </div>
-          </Link>
-
-          <Link
-            href="/review"
-            className="flex items-center gap-4 p-4 rounded-2xl border border-border bg-card active:scale-[0.98] transition"
-          >
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-              <RotateCcw size={24} className="text-primary" />
-            </div>
-            <div>
-              <p className="font-semibold">Review Flashcards</p>
-              <p className="text-sm text-muted">
-                Practice your vocabulary
-              </p>
-            </div>
-          </Link>
-        </div>
+          )}
+        </section>
       </div>
     </AppShell>
   );

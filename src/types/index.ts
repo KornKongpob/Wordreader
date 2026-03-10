@@ -12,6 +12,7 @@ export interface Article {
   id: string;
   url: string;
   title: string;
+  description?: string;
   source_name: string;
   author: string | null;
   published_at: string | null;
@@ -25,7 +26,11 @@ export interface ReadingHistory {
   user_id: string;
   article_id: string;
   read_at: string;
+  updated_at?: string;
   reading_time_sec: number | null;
+  last_position?: number;
+  last_selected_text?: string | null;
+  is_finished?: boolean;
 }
 
 export interface VocabularyItem {
@@ -36,6 +41,12 @@ export interface VocabularyItem {
   english_meaning: string;
   part_of_speech: string;
   difficulty: "easy" | "medium" | "hard";
+  tags?: string[];
+  folder_name?: string;
+  starred?: boolean;
+  notes?: string;
+  pronunciation?: string;
+  last_source_name?: string;
   created_at: string;
   updated_at: string;
 }
@@ -65,7 +76,7 @@ export interface ReviewEvent {
   id: string;
   user_id: string;
   vocabulary_item_id: string;
-  rating: "easy" | "medium" | "hard";
+  rating: "again" | "easy" | "medium" | "hard";
   reviewed_at: string;
 }
 
@@ -75,6 +86,37 @@ export interface UserSettings {
   theme: "light" | "dark" | "system";
   font_size: number;
   line_spacing: number;
+  review_goal?: number;
+  enable_notifications?: boolean;
+  reminder_hour?: number;
+  onboarding_completed?: boolean;
+  enable_offline?: boolean;
+  reader_mode?: "word" | "phrase";
+  updated_at: string;
+}
+
+export interface ArticleNote {
+  id: string;
+  user_id: string;
+  article_id: string;
+  note: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuizQuestion {
+  question: string;
+  options: string[];
+  answer_index: number;
+  explanation: string;
+}
+
+export interface ArticleQuiz {
+  id: string;
+  user_id: string;
+  article_id: string;
+  quiz: QuizQuestion[];
+  created_at: string;
   updated_at: string;
 }
 
@@ -83,6 +125,7 @@ export interface UserSettings {
 export interface ExtractedArticle {
   url: string;
   title: string;
+  description?: string;
   source_name: string;
   author: string | null;
   published_at: string | null;
@@ -98,4 +141,13 @@ export interface TranslationResult {
   contextual_meaning: string;
   context_explanation: string;
   difficulty: "easy" | "medium" | "hard";
+}
+
+export interface DashboardStats {
+  dueCount: number;
+  reviewGoal: number;
+  reviewedToday: number;
+  vocabCount: number;
+  distinctArticleCount: number;
+  streak: number;
 }

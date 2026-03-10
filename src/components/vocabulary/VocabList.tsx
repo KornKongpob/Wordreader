@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { getOfflineVocabulary, saveOfflineVocabulary } from "@/lib/offline";
 import VocabCard from "./VocabCard";
-import { Search, SlidersHorizontal, Loader2 } from "lucide-react";
+import { Loader2, Search, SlidersHorizontal, Star } from "lucide-react";
 
 interface VocabItem {
   id: string;
@@ -13,6 +14,12 @@ interface VocabItem {
   part_of_speech: string;
   difficulty: "easy" | "medium" | "hard";
   created_at: string;
+  tags?: string[];
+  folder_name?: string;
+  starred?: boolean;
+  notes?: string;
+  last_source_name?: string;
+  due_now?: boolean;
 }
 
 type SortOption = "newest" | "oldest" | "alpha";
@@ -24,15 +31,21 @@ export default function VocabList() {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortOption>("newest");
   const [diffFilter, setDiffFilter] = useState<DifficultyFilter>("all");
+  const [sourceFilter, setSourceFilter] = useState("all");
+  const [folderFilter, setFolderFilter] = useState("all");
+  const [starredOnly, setStarredOnly] = useState(false);
+  const [dueOnly, setDueOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     const fetchVocab = async () => {
       const supabase = createClient();
       if (!supabase) {
+        setItems(getOfflineVocabulary().items as VocabItem[]);
         setLoading(false);
         return;
       }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -42,41 +55,91 @@ export default function VocabList() {
         return;
       }
 
-      const { data, error } = await supabase
-        .from("vocabulary_items")
-        .select("id, word, thai_meaning, english_meaning, part_of_speech, difficulty, created_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+      const [{ data: vocabItems, error }, { data: dueStates }] = await Promise.all([
+        supabase
+          .from("vocabulary_items")
+          .select(
+            "id, word, thai_meaning, english_meaning, part_of_speech, difficulty, created_at, tags, folder_name, starred, notes, last_source_name"
+          )
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("review_states")
+          .select("vocabulary_item_id")
+          .eq("user_id", user.id)
+          .lte("next_review_at", new Date().toISOString()),
+      ]);
 
-      if (!error && data) {
-        setItems(data as VocabItem[]);
+      if (!error && vocabItems) {
+        const dueIds = new Set((dueStates ?? []).map((state) => state.vocabulary_item_id));
+        const normalizedItems = vocabItems.map((item) => ({
+          ...item,
+          due_now: dueIds.has(item.id),
+        })) as VocabItem[];
+
+        setItems(normalizedItems);
+        saveOfflineVocabulary(normalizedItems);
+      } else {
+        setItems(getOfflineVocabulary().items as VocabItem[]);
       }
+
       setLoading(false);
     };
 
-    fetchVocab();
+    void fetchVocab();
   }, []);
+
+  const availableSources = useMemo(
+    () =>
+      [...new Set(items.map((item) => item.last_source_name).filter(Boolean))].sort(
+        (a, b) => a!.localeCompare(b!)
+      ),
+    [items]
+  );
+
+  const availableFolders = useMemo(
+    () =>
+      [...new Set(items.map((item) => item.folder_name).filter(Boolean))].sort((a, b) =>
+        a!.localeCompare(b!)
+      ),
+    [items]
+  );
 
   const filtered = useMemo(() => {
     let result = [...items];
 
-    // Search filter
     if (search.trim()) {
-      const q = search.toLowerCase();
+      const query = search.toLowerCase();
       result = result.filter(
         (item) =>
-          item.word.toLowerCase().includes(q) ||
-          item.thai_meaning.toLowerCase().includes(q) ||
-          item.english_meaning.toLowerCase().includes(q)
+          item.word.toLowerCase().includes(query) ||
+          item.thai_meaning.toLowerCase().includes(query) ||
+          item.english_meaning.toLowerCase().includes(query) ||
+          (item.notes || "").toLowerCase().includes(query) ||
+          (item.tags || []).some((tag) => tag.toLowerCase().includes(query))
       );
     }
 
-    // Difficulty filter
     if (diffFilter !== "all") {
       result = result.filter((item) => item.difficulty === diffFilter);
     }
 
-    // Sort
+    if (sourceFilter !== "all") {
+      result = result.filter((item) => item.last_source_name === sourceFilter);
+    }
+
+    if (folderFilter !== "all") {
+      result = result.filter((item) => item.folder_name === folderFilter);
+    }
+
+    if (starredOnly) {
+      result = result.filter((item) => item.starred);
+    }
+
+    if (dueOnly) {
+      result = result.filter((item) => item.due_now);
+    }
+
     switch (sort) {
       case "oldest":
         result.sort(
@@ -95,7 +158,7 @@ export default function VocabList() {
     }
 
     return result;
-  }, [items, search, sort, diffFilter]);
+  }, [diffFilter, dueOnly, folderFilter, items, search, sort, sourceFilter, starredOnly]);
 
   if (loading) {
     return (
@@ -107,7 +170,6 @@ export default function VocabList() {
 
   return (
     <div className="space-y-4">
-      {/* Search bar */}
       <div className="relative">
         <Search
           size={18}
@@ -116,56 +178,119 @@ export default function VocabList() {
         <input
           type="text"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search words..."
-          className="w-full pl-10 pr-12 py-3 rounded-xl border border-border bg-background text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/50 transition text-[16px]"
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search words, notes, or tags..."
+          className="w-full rounded-xl border border-border bg-background py-3 pl-10 pr-12 text-[16px] text-foreground outline-none transition focus:ring-2 focus:ring-primary/50"
         />
         <button
-          onClick={() => setShowFilters(!showFilters)}
-          className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition ${
-            showFilters ? "text-primary bg-primary/10" : "text-muted"
+          type="button"
+          onClick={() => setShowFilters((current) => !current)}
+          className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 transition ${
+            showFilters ? "bg-primary/10 text-primary" : "text-muted"
           }`}
         >
           <SlidersHorizontal size={18} />
         </button>
       </div>
 
-      {/* Filters */}
       {showFilters && (
-        <div className="p-3 rounded-xl bg-card border border-border space-y-3">
+        <div className="space-y-4 rounded-2xl border border-border bg-card p-4">
           <div>
-            <p className="text-xs text-muted mb-2">Difficulty</p>
-            <div className="flex gap-2">
-              {(["all", "easy", "medium", "hard"] as DifficultyFilter[]).map(
-                (d) => (
-                  <button
-                    key={d}
-                    onClick={() => setDiffFilter(d)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                      diffFilter === d
-                        ? "bg-primary text-primary-foreground"
-                        : "border border-border text-muted"
-                    }`}
-                  >
-                    {d === "all" ? "All" : d}
-                  </button>
-                )
-              )}
+            <p className="mb-2 text-xs text-muted">Difficulty</p>
+            <div className="flex flex-wrap gap-2">
+              {(["all", "easy", "medium", "hard"] as DifficultyFilter[]).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setDiffFilter(value)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                    diffFilter === value
+                      ? "bg-primary text-primary-foreground"
+                      : "border border-border text-muted"
+                  }`}
+                >
+                  {value === "all" ? "All" : value}
+                </button>
+              ))}
             </div>
           </div>
+
           <div>
-            <p className="text-xs text-muted mb-2">Sort</p>
+            <p className="mb-2 text-xs text-muted">Quick filters</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setStarredOnly((current) => !current)}
+                className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                  starredOnly
+                    ? "bg-primary text-primary-foreground"
+                    : "border border-border text-muted"
+                }`}
+              >
+                <Star size={12} />
+                Starred
+              </button>
+              <button
+                type="button"
+                onClick={() => setDueOnly((current) => !current)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                  dueOnly
+                    ? "bg-primary text-primary-foreground"
+                    : "border border-border text-muted"
+                }`}
+              >
+                Due now
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="space-y-2">
+              <span className="text-xs text-muted">Source</span>
+              <select
+                value={sourceFilter}
+                onChange={(event) => setSourceFilter(event.target.value)}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"
+              >
+                <option value="all">All sources</option>
+                {availableSources.map((source) => (
+                  <option key={source} value={source}>
+                    {source}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-2">
+              <span className="text-xs text-muted">Folder</span>
+              <select
+                value={folderFilter}
+                onChange={(event) => setFolderFilter(event.target.value)}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"
+              >
+                <option value="all">All folders</option>
+                {availableFolders.map((folder) => (
+                  <option key={folder} value={folder}>
+                    {folder}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div>
+            <p className="mb-2 text-xs text-muted">Sort</p>
             <div className="flex gap-2">
               {([
                 ["newest", "Newest"],
                 ["oldest", "Oldest"],
                 ["alpha", "A-Z"],
-              ] as [SortOption, string][]).map(([val, label]) => (
+              ] as [SortOption, string][]).map(([value, label]) => (
                 <button
-                  key={val}
-                  onClick={() => setSort(val)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                    sort === val
+                  key={value}
+                  type="button"
+                  onClick={() => setSort(value)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                    sort === value
                       ? "bg-primary text-primary-foreground"
                       : "border border-border text-muted"
                   }`}
@@ -178,23 +303,23 @@ export default function VocabList() {
         </div>
       )}
 
-      {/* Count */}
       <p className="text-xs text-muted">
         {filtered.length} word{filtered.length !== 1 ? "s" : ""}
-        {search || diffFilter !== "all" ? " found" : " saved"}
+        {search || diffFilter !== "all" || sourceFilter !== "all" || folderFilter !== "all" || starredOnly || dueOnly
+          ? " found"
+          : " saved"}
       </p>
 
-      {/* List */}
       {filtered.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-muted text-sm">
+        <div className="py-12 text-center">
+          <p className="text-sm text-muted">
             {items.length === 0
-              ? "No words saved yet. Start reading articles to build your vocabulary!"
-              : "No words match your search."}
+              ? "No words saved yet. Start reading to build your vocabulary."
+              : "No words match your current filters."}
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {filtered.map((item) => (
             <VocabCard key={item.id} {...item} />
           ))}

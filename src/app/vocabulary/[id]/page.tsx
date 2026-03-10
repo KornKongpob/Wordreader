@@ -1,15 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import AppShell from "@/components/layout/AppShell";
+import SpeakButton from "@/components/common/SpeakButton";
 import {
   ArrowLeft,
-  Loader2,
-  Trash2,
-  BookOpen,
+  Bookmark,
   ExternalLink,
+  FolderOpen,
+  Loader2,
+  Save,
+  Star,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -22,6 +26,12 @@ interface VocabDetail {
   difficulty: "easy" | "medium" | "hard";
   created_at: string;
   updated_at: string;
+  tags?: string[];
+  folder_name?: string;
+  starred?: boolean;
+  notes?: string;
+  pronunciation?: string;
+  last_source_name?: string;
 }
 
 interface VocabContext {
@@ -44,6 +54,11 @@ interface ReviewState {
   repetitions: number;
 }
 
+interface ReviewEventItem {
+  rating: "again" | "easy" | "medium" | "hard";
+  reviewed_at: string;
+}
+
 export default function VocabularyDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -52,8 +67,14 @@ export default function VocabularyDetailPage() {
   const [item, setItem] = useState<VocabDetail | null>(null);
   const [contexts, setContexts] = useState<VocabContext[]>([]);
   const [reviewState, setReviewState] = useState<ReviewState | null>(null);
+  const [reviewEvents, setReviewEvents] = useState<ReviewEventItem[]>([]);
+  const [folderName, setFolderName] = useState("General");
+  const [tagInput, setTagInput] = useState("");
+  const [notes, setNotes] = useState("");
+  const [starred, setStarred] = useState(false);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -63,7 +84,10 @@ export default function VocabularyDetailPage() {
         return;
       }
 
-      // Fetch vocabulary item
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
       const { data: vocabData } = await supabase
         .from("vocabulary_items")
         .select("*")
@@ -75,9 +99,13 @@ export default function VocabularyDetailPage() {
         return;
       }
 
-      setItem(vocabData as VocabDetail);
+      const nextItem = vocabData as VocabDetail;
+      setItem(nextItem);
+      setFolderName(nextItem.folder_name || "General");
+      setTagInput((nextItem.tags || []).join(", "));
+      setNotes(nextItem.notes || "");
+      setStarred(Boolean(nextItem.starred));
 
-      // Fetch contexts with article info
       const { data: contextData } = await supabase
         .from("vocabulary_contexts")
         .select("id, original_sentence, contextual_meaning, context_explanation, created_at, article_id")
@@ -85,17 +113,16 @@ export default function VocabularyDetailPage() {
         .order("created_at", { ascending: false });
 
       if (contextData) {
-        // Fetch article info for each context
         const contextWithArticles = await Promise.all(
-          contextData.map(async (ctx) => {
+          contextData.map(async (contextRow) => {
             const { data: articleData } = await supabase
               .from("articles")
               .select("id, title, url, source_name")
-              .eq("id", ctx.article_id)
+              .eq("id", contextRow.article_id)
               .single();
 
             return {
-              ...ctx,
+              ...contextRow,
               article: articleData,
             } as VocabContext;
           })
@@ -103,29 +130,70 @@ export default function VocabularyDetailPage() {
         setContexts(contextWithArticles);
       }
 
-      // Fetch review state
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
       if (user) {
-        const { data: reviewData } = await supabase
-          .from("review_states")
-          .select("next_review_at, interval_days, repetitions")
-          .eq("user_id", user.id)
-          .eq("vocabulary_item_id", id)
-          .single();
+        const [{ data: reviewData }, { data: reviewEventData }] = await Promise.all([
+          supabase
+            .from("review_states")
+            .select("next_review_at, interval_days, repetitions")
+            .eq("user_id", user.id)
+            .eq("vocabulary_item_id", id)
+            .maybeSingle(),
+          supabase
+            .from("review_events")
+            .select("rating, reviewed_at")
+            .eq("user_id", user.id)
+            .eq("vocabulary_item_id", id)
+            .order("reviewed_at", { ascending: false })
+            .limit(8),
+        ]);
 
         if (reviewData) {
           setReviewState(reviewData as ReviewState);
+        }
+        if (reviewEventData) {
+          setReviewEvents(reviewEventData as ReviewEventItem[]);
         }
       }
 
       setLoading(false);
     };
 
-    fetchDetail();
+    void fetchDetail();
   }, [id]);
+
+  const handleSaveDetails = async () => {
+    const supabase = createClient();
+    if (!supabase || !item) return;
+
+    setSaving(true);
+
+    const nextTags = tagInput
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+
+    await supabase
+      .from("vocabulary_items")
+      .update({
+        folder_name: folderName.trim() || "General",
+        tags: nextTags,
+        notes,
+        starred,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+
+    setItem({
+      ...item,
+      folder_name: folderName.trim() || "General",
+      tags: nextTags,
+      notes,
+      starred,
+      updated_at: new Date().toISOString(),
+    });
+
+    setSaving(false);
+  };
 
   const handleDelete = async () => {
     if (!confirm("Delete this word and all its contexts?")) return;
@@ -158,9 +226,9 @@ export default function VocabularyDetailPage() {
   if (!item) {
     return (
       <AppShell>
-        <div className="px-5 py-6 max-w-lg mx-auto text-center">
+        <div className="mx-auto max-w-lg px-5 py-6 text-center">
           <p className="text-muted">Word not found.</p>
-          <Link href="/vocabulary" className="text-primary text-sm mt-2 inline-block">
+          <Link href="/vocabulary" className="mt-2 inline-block text-sm text-primary">
             Back to vocabulary
           </Link>
         </div>
@@ -168,126 +236,225 @@ export default function VocabularyDetailPage() {
     );
   }
 
+  const dueNow = reviewState ? new Date(reviewState.next_review_at) <= new Date() : false;
+
   return (
     <AppShell>
-      <div className="px-5 py-6 max-w-lg mx-auto">
-        {/* Back button */}
+      <div className="mx-auto max-w-lg px-5 py-6">
         <Link
           href="/vocabulary"
-          className="inline-flex items-center gap-1 text-muted hover:text-foreground text-sm mb-4 transition"
+          className="mb-4 inline-flex items-center gap-1 text-sm text-muted transition hover:text-foreground"
         >
           <ArrowLeft size={16} />
           Back
         </Link>
 
-        {/* Word header */}
-        <div className="mb-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">{item.word}</h1>
-              <div className="flex items-center gap-2 mt-1">
+        <div className="mb-6 rounded-[2rem] border border-border bg-card p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="mb-1 flex items-center gap-2">
+                <h1 className="text-2xl font-bold">{item.word}</h1>
+                {starred && <Star size={16} className="fill-warning text-warning" />}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
                 {item.part_of_speech && (
-                  <span className="text-sm text-muted italic">
-                    {item.part_of_speech}
-                  </span>
+                  <span className="text-sm italic text-muted">{item.part_of_speech}</span>
                 )}
                 <span
-                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${difficultyColor[item.difficulty]}`}
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${difficultyColor[item.difficulty]}`}
                 >
                   {item.difficulty}
                 </span>
+                {dueNow && (
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                    Due now
+                  </span>
+                )}
               </div>
             </div>
             <button
+              type="button"
               onClick={handleDelete}
               disabled={deleting}
-              className="p-2 text-muted hover:text-danger transition"
+              className="p-2 text-muted transition hover:text-danger"
             >
               <Trash2 size={18} />
             </button>
           </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <SpeakButton text={item.pronunciation || item.word} label="Word audio" />
+            {contexts[0]?.original_sentence && (
+              <SpeakButton text={contexts[0].original_sentence} label="Latest sentence" />
+            )}
+            {item.last_source_name && (
+              <span className="rounded-full bg-background px-3 py-1 text-xs text-muted">
+                {item.last_source_name}
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Meanings */}
-        <div className="space-y-3 mb-6">
-          <div className="p-4 rounded-xl bg-card border border-border">
-            <p className="text-xs text-muted mb-1 uppercase tracking-wide">
-              Thai
-            </p>
+        <div className="mb-6 space-y-3">
+          <div className="rounded-2xl border border-border bg-card p-4">
+            <p className="mb-1 text-xs uppercase tracking-wide text-muted">Thai</p>
             <p className="text-lg">{item.thai_meaning}</p>
           </div>
 
-          <div className="p-4 rounded-xl bg-card border border-border">
-            <p className="text-xs text-muted mb-1 uppercase tracking-wide">
-              English
-            </p>
+          <div className="rounded-2xl border border-border bg-card p-4">
+            <p className="mb-1 text-xs uppercase tracking-wide text-muted">English</p>
             <p className="text-sm">{item.english_meaning}</p>
           </div>
         </div>
 
-        {/* Review status */}
-        {reviewState && (
-          <div className="p-4 rounded-xl bg-card border border-border mb-6">
-            <p className="text-xs text-muted mb-2 uppercase tracking-wide">
-              Review Status
-            </p>
-            <div className="flex items-center gap-4 text-sm">
-              <div>
-                <span className="text-muted">Next review:</span>{" "}
-                <span className="font-medium">
-                  {new Date(reviewState.next_review_at) <= new Date()
-                    ? "Due now"
-                    : new Date(reviewState.next_review_at).toLocaleDateString(
-                        "en-US",
-                        { month: "short", day: "numeric" }
-                      )}
-                </span>
+        <section className="mb-6 rounded-2xl border border-border bg-card p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Bookmark size={16} className="text-primary" />
+            <h2 className="font-medium">Organization</h2>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between rounded-xl bg-background px-3 py-3">
+              <div className="flex items-start gap-2">
+                <FolderOpen size={16} className="mt-0.5 text-muted" />
+                <div>
+                  <p className="text-sm font-medium">Favorite this word</p>
+                  <p className="text-xs text-muted">Keep important words easy to find.</p>
+                </div>
               </div>
-              <div>
-                <span className="text-muted">Reviews:</span>{" "}
-                <span className="font-medium">{reviewState.repetitions}</span>
+              <button
+                type="button"
+                onClick={() => setStarred((current) => !current)}
+                className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  starred ? "bg-primary text-primary-foreground" : "border border-border text-muted"
+                }`}
+              >
+                {starred ? "Starred" : "Star"}
+              </button>
+            </div>
+
+            <label className="block">
+              <span className="mb-2 block text-xs text-muted">Folder</span>
+              <input
+                type="text"
+                value={folderName}
+                onChange={(event) => setFolderName(event.target.value)}
+                placeholder="General"
+                className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-xs text-muted">Tags</span>
+              <input
+                type="text"
+                value={tagInput}
+                onChange={(event) => setTagInput(event.target.value)}
+                placeholder="news, health, business"
+                className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-xs text-muted">Notes</span>
+              <textarea
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Write your own example sentence or memory trick."
+                className="min-h-28 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+              />
+            </label>
+
+            <button
+              type="button"
+              onClick={() => void handleSaveDetails()}
+              disabled={saving}
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+            >
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              Save changes
+            </button>
+          </div>
+        </section>
+
+        {reviewState && (
+          <section className="mb-6 rounded-2xl border border-border bg-card p-4">
+            <h2 className="mb-3 font-medium">Review status</h2>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-xl bg-background px-3 py-3">
+                <p className="text-xs uppercase tracking-wide text-muted">Next review</p>
+                <p className="mt-2 font-medium">
+                  {dueNow
+                    ? "Due now"
+                    : new Date(reviewState.next_review_at).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                </p>
+              </div>
+              <div className="rounded-xl bg-background px-3 py-3">
+                <p className="text-xs uppercase tracking-wide text-muted">Repetitions</p>
+                <p className="mt-2 font-medium">{reviewState.repetitions}</p>
               </div>
             </div>
-          </div>
+
+            {reviewEvents.length > 0 && (
+              <div className="mt-4">
+                <p className="mb-2 text-xs uppercase tracking-wide text-muted">Recent ratings</p>
+                <div className="space-y-2">
+                  {reviewEvents.map((event) => (
+                    <div
+                      key={`${event.reviewed_at}-${event.rating}`}
+                      className="flex items-center justify-between rounded-xl bg-background px-3 py-2 text-sm"
+                    >
+                      <span className="font-medium capitalize">{event.rating}</span>
+                      <span className="text-xs text-muted">
+                        {new Date(event.reviewed_at).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
         )}
 
-        {/* Contexts */}
         {contexts.length > 0 && (
-          <div className="mb-6">
-            <h2 className="text-sm font-medium text-muted mb-3 uppercase tracking-wide">
+          <section className="mb-6">
+            <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted">
               Contexts ({contexts.length})
             </h2>
             <div className="space-y-3">
-              {contexts.map((ctx) => (
+              {contexts.map((context) => (
                 <div
-                  key={ctx.id}
-                  className="p-4 rounded-xl bg-card border border-border space-y-2"
+                  key={context.id}
+                  className="space-y-2 rounded-2xl border border-border bg-card p-4"
                 >
                   <p className="text-sm italic leading-relaxed">
-                    &ldquo;{ctx.original_sentence}&rdquo;
+                    &ldquo;{context.original_sentence}&rdquo;
                   </p>
-                  {ctx.contextual_meaning && (
+                  {context.contextual_meaning && (
                     <p className="text-sm text-muted">
                       <strong className="text-foreground">Meaning here:</strong>{" "}
-                      {ctx.contextual_meaning}
+                      {context.contextual_meaning}
                     </p>
                   )}
-                  {ctx.context_explanation && (
-                    <p className="text-xs text-muted">
-                      {ctx.context_explanation}
-                    </p>
+                  {context.context_explanation && (
+                    <p className="text-xs text-muted">{context.context_explanation}</p>
                   )}
-                  {ctx.article && (
+                  {context.article && (
                     <div className="flex items-center gap-1 pt-1">
-                      <BookOpen size={12} className="text-muted" />
                       <Link
-                        href={`/read/${ctx.article.id}`}
-                        className="text-xs text-primary hover:underline truncate"
+                        href={`/read/${context.article.id}`}
+                        className="truncate text-xs text-primary hover:underline"
                       >
-                        {ctx.article.title}
+                        {context.article.title}
                       </Link>
                       <a
-                        href={ctx.article.url}
+                        href={context.article.url}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-muted hover:text-primary"
@@ -299,11 +466,10 @@ export default function VocabularyDetailPage() {
                 </div>
               ))}
             </div>
-          </div>
+          </section>
         )}
 
-        {/* Metadata */}
-        <div className="text-xs text-muted space-y-1">
+        <div className="space-y-1 text-xs text-muted">
           <p>
             Added:{" "}
             {new Date(item.created_at).toLocaleDateString("en-US", {

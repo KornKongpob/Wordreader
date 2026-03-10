@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { RotateCcw } from "lucide-react";
+import SpeakButton from "@/components/common/SpeakButton";
 
 interface FlashcardProps {
   word: string;
@@ -10,7 +11,7 @@ interface FlashcardProps {
   part_of_speech: string;
   example_sentence: string;
   contextual_meaning: string;
-  onRate: (rating: "easy" | "medium" | "hard") => void;
+  onRate: (rating: "again" | "easy" | "medium" | "hard") => void;
   current: number;
   total: number;
 }
@@ -55,6 +56,12 @@ export default function Flashcard({
             {part_of_speech && (
               <p className="text-sm text-muted italic mb-4">{part_of_speech}</p>
             )}
+            <div className="mb-4 flex flex-wrap justify-center gap-2">
+              <SpeakButton text={word} label="Word audio" />
+              {example_sentence && (
+                <SpeakButton text={example_sentence} label="Sentence audio" />
+              )}
+            </div>
             {example_sentence && (
               <p className="text-sm text-muted leading-relaxed max-w-sm">
                 &ldquo;{example_sentence}&rdquo;
@@ -83,7 +90,16 @@ export default function Flashcard({
 
       {/* Rating buttons — only shown when flipped */}
       {flipped && (
-        <div className="w-full grid grid-cols-3 gap-3">
+        <div className="w-full grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <button
+            onClick={() => {
+              setFlipped(false);
+              onRate("again");
+            }}
+            className="py-3 rounded-xl border border-border text-foreground font-medium text-sm active:scale-[0.97] transition"
+          >
+            Again today
+          </button>
           <button
             onClick={() => {
               setFlipped(false);

@@ -23,6 +23,25 @@ interface TranslationOutput {
   difficulty: "easy" | "medium" | "hard";
 }
 
+interface QuizInput {
+  articleTitle: string;
+  content: string;
+}
+
+interface QuizQuestion {
+  question: string;
+  options: string[];
+  answer_index: number;
+  explanation: string;
+}
+
+interface RawQuizQuestion {
+  question?: unknown;
+  options?: unknown;
+  answer_index?: unknown;
+  explanation?: unknown;
+}
+
 export async function translateWord(
   input: TranslationInput
 ): Promise<TranslationOutput> {
@@ -73,4 +92,71 @@ Return JSON with these exact keys:
       ? parsed.difficulty
       : "medium",
   };
+}
+
+export async function generateArticleQuiz(
+  input: QuizInput
+): Promise<QuizQuestion[]> {
+  const openai = getOpenAIClient();
+  const trimmedContent = input.content.replace(/\s+/g, " ").slice(0, 9000);
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    temperature: 0.4,
+    max_tokens: 900,
+    messages: [
+      {
+        role: "system",
+        content:
+          "You create short reading-comprehension quizzes for English learners. Respond in JSON only.",
+      },
+      {
+        role: "user",
+        content: `Create exactly 4 multiple-choice questions for this article.
+
+Article title: "${input.articleTitle}"
+Article content: "${trimmedContent}"
+
+Return JSON with a single key:
+- questions: array of 4 items
+
+Each question item must have:
+- question: concise question in English
+- options: array of exactly 4 short options
+- answer_index: 0-based index of the correct option
+- explanation: one short sentence explaining the answer`,
+      },
+    ],
+    response_format: { type: "json_object" },
+  });
+
+  const content = response.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error("No quiz response from OpenAI");
+  }
+
+  const parsed = JSON.parse(content);
+  const questions = Array.isArray(parsed.questions)
+    ? (parsed.questions as RawQuizQuestion[])
+    : [];
+
+  return questions
+    .filter((item) => Array.isArray(item.options) && item.options.length === 4)
+    .slice(0, 4)
+    .map((item): QuizQuestion => {
+      const answerIndex =
+        typeof item.answer_index === "number" &&
+        Number.isInteger(item.answer_index) &&
+        item.answer_index >= 0 &&
+        item.answer_index < 4
+          ? item.answer_index
+          : 0;
+
+      return {
+        question: String(item.question || ""),
+        options: (item.options as unknown[]).map((option) => String(option)),
+        answer_index: answerIndex,
+        explanation: String(item.explanation || ""),
+      };
+    });
 }

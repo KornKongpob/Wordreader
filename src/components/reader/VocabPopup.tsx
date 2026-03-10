@@ -9,12 +9,14 @@ import {
   Check,
   Languages,
 } from "lucide-react";
+import SpeakButton from "@/components/common/SpeakButton";
 
 interface VocabPopupProps {
   word: string;
   sentence: string;
   articleId: string;
   articleTitle: string;
+  articleSourceName: string;
   onClose: () => void;
 }
 
@@ -32,6 +34,7 @@ export default function VocabPopup({
   sentence,
   articleId,
   articleTitle,
+  articleSourceName,
   onClose,
 }: VocabPopupProps) {
   const [translation, setTranslation] = useState<TranslationData | null>(null);
@@ -95,7 +98,7 @@ export default function VocabPopup({
         .select("id")
         .eq("user_id", user.id)
         .ilike("word", word.trim())
-        .single();
+        .maybeSingle();
 
       let vocabItemId: string;
 
@@ -110,6 +113,7 @@ export default function VocabPopup({
             english_meaning: translation.english_meaning,
             part_of_speech: translation.part_of_speech,
             difficulty: translation.difficulty,
+            last_source_name: articleSourceName,
             updated_at: new Date().toISOString(),
           })
           .eq("id", vocabItemId);
@@ -124,6 +128,8 @@ export default function VocabPopup({
             english_meaning: translation.english_meaning,
             part_of_speech: translation.part_of_speech,
             difficulty: translation.difficulty,
+            pronunciation: word.trim(),
+            last_source_name: articleSourceName,
           })
           .select("id")
           .single();
@@ -183,6 +189,10 @@ export default function VocabPopup({
               <p className="text-sm text-muted line-clamp-2 mt-0.5">
                 &ldquo;...{sentence.length > 120 ? sentence.slice(0, 120) + "..." : sentence}&rdquo;
               </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <SpeakButton text={word} label="Word audio" />
+                <SpeakButton text={sentence} label="Sentence audio" />
+              </div>
             </div>
             <button
               onClick={onClose}
@@ -237,6 +247,10 @@ export default function VocabPopup({
                 <p className="text-xs text-muted mt-2">
                   {translation.context_explanation}
                 </p>
+              </div>
+
+              <div className="rounded-xl border border-border bg-card px-3 py-2 text-xs text-muted">
+                Source: <span className="font-medium text-foreground">{articleSourceName}</span>
               </div>
 
               {/* Difficulty badge */}

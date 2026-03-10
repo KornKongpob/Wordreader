@@ -16,15 +16,19 @@ import Link from "next/link";
 interface ReaderControlsProps {
   fontSize: number;
   lineSpacing: number;
+  lookupMode: "word" | "phrase";
   onFontSizeChange: (size: number) => void;
   onLineSpacingChange: (spacing: number) => void;
+  onLookupModeChange: (mode: "word" | "phrase") => void;
 }
 
 export default function ReaderControls({
   fontSize,
   lineSpacing,
+  lookupMode,
   onFontSizeChange,
   onLineSpacingChange,
+  onLookupModeChange,
 }: ReaderControlsProps) {
   const { resolvedTheme, setTheme } = useTheme();
   const [showPanel, setShowPanel] = useState(false);
@@ -125,6 +129,25 @@ export default function ReaderControls({
                     }`}
                   >
                     {val}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted">Lookup Mode</span>
+              <div className="flex items-center gap-2">
+                {(["word", "phrase"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => onLookupModeChange(mode)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                      lookupMode === mode
+                        ? "bg-primary text-primary-foreground"
+                        : "border border-border text-muted hover:text-foreground"
+                    }`}
+                  >
+                    {mode === "word" ? "Single word" : "Phrase"}
                   </button>
                 ))}
               </div>

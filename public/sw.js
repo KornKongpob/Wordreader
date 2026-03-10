@@ -1,6 +1,25 @@
-// WordReader Service Worker — basic cache-first for static assets
-const CACHE_NAME = "wordreader-v1";
-const STATIC_ASSETS = ["/", "/manifest.json"];
+// WordReader Service Worker — cache only immutable/static assets.
+const CACHE_NAME = "wordreader-static-v2";
+const STATIC_ASSETS = [
+  "/manifest.json",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+];
+
+function isCacheableStaticAsset(request, url) {
+  if (request.method !== "GET") return false;
+  if (url.origin !== self.location.origin) return false;
+  if (request.mode === "navigate" || request.destination === "document") {
+    return false;
+  }
+
+  return (
+    url.pathname.startsWith("/_next/static/") ||
+    url.pathname.startsWith("/icons/") ||
+    STATIC_ASSETS.includes(url.pathname) ||
+    ["image", "script", "style", "font"].includes(request.destination)
+  );
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -21,18 +40,14 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  // Only cache GET requests
-  if (event.request.method !== "GET") return;
-
-  // Skip API calls and auth-related requests
   const url = new URL(event.request.url);
-  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/auth/")) return;
+  if (!isCacheableStaticAsset(event.request, url)) return;
 
   event.respondWith(
     caches.match(event.request).then((cached) => {
-      // Return cached version or fetch from network
-      return cached || fetch(event.request).then((response) => {
-        // Don't cache non-successful responses
+      if (cached) return cached;
+
+      return fetch(event.request).then((response) => {
         if (!response || response.status !== 200) return response;
 
         const responseClone = response.clone();

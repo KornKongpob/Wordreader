@@ -8,47 +8,78 @@ interface TextSelection {
   position: { x: number; y: number };
 }
 
-export function useTextSelection(containerRef: React.RefObject<HTMLElement | null>) {
+interface UseTextSelectionOptions {
+  maxLength?: number;
+}
+
+export function useTextSelection(
+  containerRef: React.RefObject<HTMLElement | null>,
+  options: UseTextSelectionOptions = {}
+) {
   const [selection, setSelection] = useState<TextSelection | null>(null);
   const isProcessing = useRef(false);
+  const maxLength = options.maxLength ?? 100;
 
-  // Extract the full sentence containing the selected text
   const getSentenceFromRange = useCallback((range: Range): string => {
-    // Get the text node and expand to find sentence boundaries
-    const node = range.startContainer;
-    if (node.nodeType !== Node.TEXT_NODE) {
-      return range.toString().trim();
+    const selectedText = range.toString().trim();
+    if (!selectedText) return "";
+
+    const container = containerRef.current;
+    let scope: Node = range.commonAncestorContainer;
+
+    if (scope.nodeType === Node.TEXT_NODE) {
+      scope = scope.parentNode ?? scope;
     }
 
-    const fullText = node.textContent || "";
-    const offset = range.startOffset;
-
-    // Find sentence start (look backward for . ! ? or start of text)
-    let sentenceStart = 0;
-    for (let i = offset - 1; i >= 0; i--) {
-      if (".!?".includes(fullText[i])) {
-        sentenceStart = i + 1;
-        break;
+    while (scope.parentNode && scope.parentNode !== container) {
+      if (scope instanceof HTMLElement) {
+        const tag = scope.tagName.toLowerCase();
+        if (["p", "li", "blockquote", "figcaption"].includes(tag) || /^h[1-6]$/.test(tag)) {
+          break;
+        }
       }
+      scope = scope.parentNode;
     }
 
-    // Find sentence end (look forward for . ! ? or end of text)
-    let sentenceEnd = fullText.length;
-    for (let i = offset; i < fullText.length; i++) {
-      if (".!?".includes(fullText[i])) {
-        sentenceEnd = i + 1;
-        break;
+    try {
+      const fullText = scope.textContent || "";
+      if (!fullText) return selectedText;
+
+      const beforeRange = range.cloneRange();
+      beforeRange.selectNodeContents(scope);
+      beforeRange.setEnd(range.startContainer, range.startOffset);
+
+      const startIndex = beforeRange.toString().length;
+      const endIndex = startIndex + range.toString().length;
+
+      let sentenceStart = 0;
+      for (let i = startIndex - 1; i >= 0; i--) {
+        if (".!?\n".includes(fullText[i])) {
+          sentenceStart = i + 1;
+          break;
+        }
       }
-    }
 
-    return fullText.slice(sentenceStart, sentenceEnd).trim();
-  }, []);
+      let sentenceEnd = fullText.length;
+      for (let i = endIndex; i < fullText.length; i++) {
+        if (".!?\n".includes(fullText[i])) {
+          sentenceEnd = i + 1;
+          break;
+        }
+      }
+
+      return fullText.slice(sentenceStart, sentenceEnd).replace(/\s+/g, " ").trim();
+    } catch {
+      return selectedText;
+    }
+  }, [containerRef]);
 
   const handleSelectionChange = useCallback(() => {
     if (isProcessing.current) return;
 
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || !sel.rangeCount) {
+      setSelection(null);
       return;
     }
 
@@ -56,12 +87,14 @@ export function useTextSelection(containerRef: React.RefObject<HTMLElement | nul
     const text = sel.toString().trim();
 
     // Ignore empty or very long selections
-    if (!text || text.length > 100) {
+    if (!text || text.length > maxLength) {
+      setSelection(null);
       return;
     }
 
     // Only handle selections within our container
     if (containerRef.current && !containerRef.current.contains(range.commonAncestorContainer)) {
+      setSelection(null);
       return;
     }
 
@@ -76,7 +109,7 @@ export function useTextSelection(containerRef: React.RefObject<HTMLElement | nul
     const sentence = getSentenceFromRange(range);
 
     setSelection({ text, sentence, position });
-  }, [containerRef, getSentenceFromRange]);
+  }, [containerRef, getSentenceFromRange, maxLength]);
 
   const clearSelection = useCallback(() => {
     setSelection(null);

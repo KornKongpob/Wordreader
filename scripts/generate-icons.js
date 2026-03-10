@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
+
 // Simple script to generate PWA icon placeholders as valid PNGs
 // Uses a minimal 1x1 blue PNG and scales concept
 // For production, replace with proper designed icons
