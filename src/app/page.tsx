@@ -173,12 +173,13 @@ export default async function HomePage() {
   return (
     <AppShell>
       <div className="mx-auto max-w-lg px-5 py-6">
-        <section className="mb-6 rounded-[2rem] bg-[linear-gradient(135deg,rgba(37,99,235,0.16),rgba(14,165,233,0.08),rgba(255,255,255,0.02))] p-6">
+        <section className="glass-hero mb-6 rounded-[2rem] p-6">
           <div className="mb-4 flex items-center gap-2 text-sm text-primary">
             <Sparkles size={16} />
             <span>Daily reading dashboard</span>
           </div>
-          <h1 className="text-3xl font-bold leading-tight">
+          <p className="editorial-label mb-2">Today&apos;s Reading Desk</p>
+          <h1 className="text-3xl font-bold leading-tight tracking-tight">
             Hello, {firstName}
           </h1>
           <p className="mt-2 text-sm text-muted">
@@ -186,12 +187,12 @@ export default async function HomePage() {
             {dueCount ?? 0} waiting next.
           </p>
 
-          <div className="mt-5 rounded-2xl border border-white/20 bg-background/70 p-4">
+          <div className="glass-panel mt-5 rounded-2xl p-4">
             <div className="mb-2 flex items-center justify-between text-sm">
               <span className="font-medium">Daily review goal</span>
               <span className="text-muted">{reviewedCount}/{reviewGoal}</span>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-border">
+            <div className="h-2 overflow-hidden rounded-full bg-primary/10">
               <div
                 className="h-full rounded-full bg-primary transition-all"
                 style={{ width: `${progress}%` }}
@@ -210,13 +211,13 @@ export default async function HomePage() {
         />
 
         <section className="mb-6 grid grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-border bg-card p-4">
-            <p className="text-xs uppercase tracking-wide text-muted">Vocabulary</p>
+          <div className="glass-panel rounded-2xl p-4">
+            <p className="editorial-label">Vocabulary</p>
             <p className="mt-2 text-2xl font-bold">{vocabCount ?? 0}</p>
             <p className="mt-1 text-xs text-muted">Saved words ready to revisit</p>
           </div>
-          <div className="rounded-2xl border border-border bg-card p-4">
-            <p className="text-xs uppercase tracking-wide text-muted">Articles</p>
+          <div className="glass-panel rounded-2xl p-4">
+            <p className="editorial-label">Articles</p>
             <p className="mt-2 text-2xl font-bold">{distinctArticleCount}</p>
             <p className="mt-1 text-xs text-muted">Distinct pieces you&apos;ve read</p>
           </div>
@@ -234,7 +235,7 @@ export default async function HomePage() {
           <div className="grid gap-3">
             <Link
               href="/read"
-              className="flex items-center gap-4 rounded-2xl bg-primary px-4 py-4 text-primary-foreground transition active:scale-[0.98]"
+              className="glow-button flex items-center gap-4 rounded-[1.7rem] px-4 py-4 text-primary-foreground transition active:scale-[0.98]"
             >
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20">
                 <BookOpen size={24} />
@@ -248,7 +249,7 @@ export default async function HomePage() {
             <div className="grid grid-cols-2 gap-3">
               <Link
                 href="/vocabulary"
-                className="rounded-2xl border border-border bg-card p-4 transition active:scale-[0.98]"
+                className="glass-panel rounded-2xl p-4 transition active:scale-[0.98]"
               >
                 <Library size={18} className="mb-3 text-primary" />
                 <p className="font-semibold">Organize words</p>
@@ -256,7 +257,7 @@ export default async function HomePage() {
               </Link>
               <Link
                 href="/review"
-                className="rounded-2xl border border-border bg-card p-4 transition active:scale-[0.98]"
+                className="glass-panel rounded-2xl p-4 transition active:scale-[0.98]"
               >
                 <RotateCcw size={18} className="mb-3 text-primary" />
                 <p className="font-semibold">Review deck</p>
@@ -277,7 +278,7 @@ export default async function HomePage() {
           </div>
 
           {continueReading.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border bg-card p-5 text-center">
+            <div className="glass-panel rounded-2xl p-5 text-center">
               <BookOpenText size={22} className="mx-auto mb-3 text-primary" />
               <p className="font-medium">No article in progress yet</p>
               <p className="mt-1 text-sm text-muted">
@@ -293,7 +294,7 @@ export default async function HomePage() {
                   <Link
                     key={entry.article_id}
                     href={`/read/${entry.article_id}`}
-                    className="flex items-start justify-between gap-3 rounded-2xl border border-border bg-card p-4 transition active:scale-[0.98]"
+                    className="glass-panel flex items-start justify-between gap-3 rounded-2xl p-4 transition active:scale-[0.98]"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="text-xs uppercase tracking-wide text-primary">
@@ -306,7 +307,7 @@ export default async function HomePage() {
                         {formatRelativeTime(entry.updated_at)}
                       </p>
                     </div>
-                    <div className="rounded-full border border-border px-3 py-1 text-xs text-muted">
+                    <div className="glass-chip rounded-full px-3 py-1 text-xs text-muted">
                       {entry.last_position && entry.last_position > 0 ? "Resume" : "Open"}
                     </div>
                   </Link>

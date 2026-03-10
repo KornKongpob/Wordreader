@@ -39,12 +39,11 @@ export default function ReaderControls({
 
   return (
     <>
-      {/* Top bar */}
-      <div className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-sm pt-safe">
-        <div className="flex items-center justify-between h-12 px-4 max-w-2xl mx-auto">
+      <div className="sticky top-0 z-40 px-3 pt-safe">
+        <div className="glass-nav mx-auto mt-3 flex h-14 max-w-2xl items-center justify-between rounded-[1.6rem] px-4">
           <Link
             href="/read"
-            className="flex items-center gap-1 text-muted hover:text-foreground transition"
+            className="glass-chip flex items-center gap-1 rounded-full px-3 py-1.5 text-muted transition hover:text-foreground"
           >
             <ArrowLeft size={20} />
             <span className="text-sm">Back</span>
@@ -53,10 +52,10 @@ export default function ReaderControls({
           <div className="flex items-center gap-1">
             <button
               onClick={() => setShowPanel(!showPanel)}
-              className={`p-2 rounded-lg transition ${
+              className={`rounded-xl p-2 transition ${
                 showPanel
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted hover:text-foreground"
+                  ? "glass-chip text-primary"
+                  : "subtle-button text-muted hover:text-foreground"
               }`}
               aria-label="Reading settings"
             >
@@ -65,7 +64,7 @@ export default function ReaderControls({
 
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-lg text-muted hover:text-foreground transition"
+              className="subtle-button rounded-xl p-2 text-muted transition hover:text-foreground"
               aria-label="Toggle dark mode"
             >
               {resolvedTheme === "dark" ? (
@@ -78,15 +77,17 @@ export default function ReaderControls({
         </div>
       </div>
 
-      {/* Settings panel */}
       {showPanel && (
-        <div className="sticky top-12 z-30 border-b border-border bg-card">
-          <div className="px-4 py-3 max-w-2xl mx-auto space-y-4">
+        <div className="sticky top-[4.75rem] z-30 px-3">
+          <div className="glass-panel mx-auto max-w-2xl rounded-[1.5rem] px-4 py-4 space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Reading Settings</span>
+              <div>
+                <p className="editorial-label mb-1">Reader Controls</p>
+                <span className="text-sm font-medium">Reading Settings</span>
+              </div>
               <button
                 onClick={() => setShowPanel(false)}
-                className="p-1 text-muted hover:text-foreground"
+                className="subtle-button rounded-xl p-1.5 text-muted hover:text-foreground"
               >
                 <X size={16} />
               </button>
@@ -98,7 +99,7 @@ export default function ReaderControls({
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => onFontSizeChange(Math.max(14, fontSize - 2))}
-                  className="w-8 h-8 rounded-lg border border-border flex items-center justify-center text-muted hover:text-foreground transition"
+                  className="subtle-button flex h-8 w-8 items-center justify-center rounded-lg text-muted transition hover:text-foreground"
                 >
                   <Minus size={14} />
                 </button>
@@ -107,7 +108,7 @@ export default function ReaderControls({
                 </span>
                 <button
                   onClick={() => onFontSizeChange(Math.min(28, fontSize + 2))}
-                  className="w-8 h-8 rounded-lg border border-border flex items-center justify-center text-muted hover:text-foreground transition"
+                  className="subtle-button flex h-8 w-8 items-center justify-center rounded-lg text-muted transition hover:text-foreground"
                 >
                   <Plus size={14} />
                 </button>
@@ -124,8 +125,8 @@ export default function ReaderControls({
                     onClick={() => onLineSpacingChange(val)}
                     className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
                       lineSpacing === val
-                        ? "bg-primary text-primary-foreground"
-                        : "border border-border text-muted hover:text-foreground"
+                        ? "glow-button text-primary-foreground"
+                        : "subtle-button text-muted hover:text-foreground"
                     }`}
                   >
                     {val}
@@ -143,8 +144,8 @@ export default function ReaderControls({
                     onClick={() => onLookupModeChange(mode)}
                     className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
                       lookupMode === mode
-                        ? "bg-primary text-primary-foreground"
-                        : "border border-border text-muted hover:text-foreground"
+                        ? "glow-button text-primary-foreground"
+                        : "subtle-button text-muted hover:text-foreground"
                     }`}
                   >
                     {mode === "word" ? "Single word" : "Phrase"}

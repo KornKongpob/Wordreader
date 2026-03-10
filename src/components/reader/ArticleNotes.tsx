@@ -79,7 +79,7 @@ export default function ArticleNotes({ articleId }: ArticleNotesProps) {
   };
 
   return (
-    <section className="mt-8 rounded-2xl border border-border bg-card p-4">
+    <section className="glass-panel mt-8 rounded-2xl p-4">
       <div className="mb-3 flex items-center gap-2">
         <StickyNote size={16} className="text-primary" />
         <h2 className="font-medium">Article notes</h2>
@@ -95,7 +95,7 @@ export default function ArticleNotes({ articleId }: ArticleNotesProps) {
             value={note}
             onChange={(event) => setNote(event.target.value)}
             placeholder="Write a quick summary, new expression, or your own example sentence."
-            className="min-h-28 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary/50"
+            className="glass-input min-h-28 w-full rounded-xl px-3 py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary/40"
           />
           <div className="mt-3 flex items-center justify-between">
             <p className="text-xs text-muted">Your notes sync with this article.</p>
@@ -105,7 +105,7 @@ export default function ArticleNotes({ articleId }: ArticleNotesProps) {
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+                className="glow-button inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                 Save note

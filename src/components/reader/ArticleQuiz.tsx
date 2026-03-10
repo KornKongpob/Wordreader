@@ -100,7 +100,7 @@ export default function ArticleQuiz({
   }, 0);
 
   return (
-    <section className="mt-8 rounded-2xl border border-border bg-card p-4">
+    <section className="glass-panel mt-8 rounded-2xl p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Brain size={16} className="text-primary" />
@@ -113,7 +113,7 @@ export default function ArticleQuiz({
           type="button"
           onClick={handleGenerate}
           disabled={loading}
-          className="rounded-xl border border-border px-3 py-2 text-sm font-medium hover:bg-background disabled:opacity-60"
+          className="subtle-button rounded-xl px-3 py-2 text-sm font-medium disabled:opacity-60"
         >
           {loading ? "Generating..." : questions.length ? "Refresh quiz" : "Generate quiz"}
         </button>
@@ -126,21 +126,25 @@ export default function ArticleQuiz({
         </div>
       )}
 
-      {error && <p className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
+      {error && (
+        <p className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>
+      )}
 
       {questions.length > 0 && (
         <div className="space-y-4">
-          <div className="rounded-xl bg-background px-3 py-2 text-sm text-muted">
+          <div className="glass-chip rounded-xl px-3 py-2 text-sm text-muted">
             Score: {score}/{questions.length}
-            {answered < questions.length && ` • ${questions.length - answered} left`}
+            {answered < questions.length && ` | ${questions.length - answered} left`}
           </div>
           {questions.map((question, index) => {
             const selectedOption = selected[index];
             const isAnswered = selectedOption !== undefined;
 
             return (
-              <div key={`${question.question}-${index}`} className="rounded-2xl border border-border p-4">
-                <p className="mb-3 font-medium">{index + 1}. {question.question}</p>
+              <div key={`${question.question}-${index}`} className="glass-panel rounded-2xl p-4">
+                <p className="mb-3 font-medium">
+                  {index + 1}. {question.question}
+                </p>
                 <div className="space-y-2">
                   {question.options.map((option, optionIndex) => {
                     const isCorrect = optionIndex === question.answer_index;
@@ -159,9 +163,9 @@ export default function ArticleQuiz({
                             ? isCorrect
                               ? "border-success bg-success/10 text-foreground"
                               : isSelected
-                              ? "border-danger bg-danger/10 text-foreground"
-                              : "border-border text-muted"
-                            : "border-border hover:bg-background"
+                                ? "border-danger bg-danger/10 text-foreground"
+                                : "border-border text-muted"
+                            : "subtle-button hover:text-foreground"
                         }`}
                       >
                         {option}
@@ -170,7 +174,7 @@ export default function ArticleQuiz({
                   })}
                 </div>
                 {isAnswered && (
-                  <div className="mt-3 flex items-start gap-2 rounded-xl bg-background px-3 py-2 text-sm text-muted">
+                  <div className="glass-chip mt-3 flex items-start gap-2 rounded-xl px-3 py-2 text-sm text-muted">
                     <CheckCircle2 size={16} className="mt-0.5 text-primary" />
                     <span>{question.explanation}</span>
                   </div>

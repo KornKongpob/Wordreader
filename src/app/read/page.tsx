@@ -253,10 +253,11 @@ export default function ReadPage() {
   return (
     <AppShell>
       <div className="mx-auto max-w-lg px-5 py-6">
-        <section className="mb-6 rounded-[2rem] border border-border bg-card p-5">
+        <section className="glass-hero mb-6 rounded-[2rem] p-5">
           <div className="mb-4 flex items-center gap-2">
             <Upload size={18} className="text-primary" />
             <div>
+              <p className="editorial-label mb-1">Import A Story</p>
               <h1 className="text-xl font-bold">Read an article</h1>
               <p className="text-sm text-muted">
                 Bring in a URL or paste text you want to study.
@@ -270,8 +271,8 @@ export default function ReadPage() {
               onClick={() => setMode("url")}
               className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
                 mode === "url"
-                  ? "bg-primary text-primary-foreground"
-                  : "border border-border text-muted"
+                  ? "glow-button text-primary-foreground"
+                  : "subtle-button text-muted"
               }`}
             >
               <span className="inline-flex items-center gap-2">
@@ -284,8 +285,8 @@ export default function ReadPage() {
               onClick={() => setMode("text")}
               className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
                 mode === "text"
-                  ? "bg-primary text-primary-foreground"
-                  : "border border-border text-muted"
+                  ? "glow-button text-primary-foreground"
+                  : "subtle-button text-muted"
               }`}
             >
               <span className="inline-flex items-center gap-2">
@@ -304,12 +305,12 @@ export default function ReadPage() {
                 placeholder="https://edition.cnn.com/2026/..."
                 required
                 disabled={loading}
-                className="w-full rounded-xl border border-border bg-background px-4 py-3.5 text-[16px] text-foreground outline-none transition focus:ring-2 focus:ring-primary/50"
+                className="glass-input w-full rounded-xl px-4 py-3.5 text-[16px] text-foreground outline-none transition focus:ring-2 focus:ring-primary/40"
               />
               <button
                 type="submit"
                 disabled={loading || !url.trim()}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
+                className="glow-button flex w-full items-center justify-center gap-2 rounded-xl py-3.5 font-medium text-primary-foreground transition hover:opacity-95 disabled:opacity-50"
               >
                 {loading ? (
                   <>
@@ -333,7 +334,7 @@ export default function ReadPage() {
                 placeholder="Article title"
                 required
                 disabled={loading}
-                className="w-full rounded-xl border border-border bg-background px-4 py-3 text-[16px] outline-none transition focus:ring-2 focus:ring-primary/50"
+                className="glass-input w-full rounded-xl px-4 py-3 text-[16px] outline-none transition focus:ring-2 focus:ring-primary/40"
               />
               <div className="grid grid-cols-2 gap-3">
                 <input
@@ -342,7 +343,7 @@ export default function ReadPage() {
                   onChange={(event) => setManualSource(event.target.value)}
                   placeholder="Source name"
                   disabled={loading}
-                  className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary/50"
+                  className="glass-input w-full rounded-xl px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary/40"
                 />
                 <input
                   type="url"
@@ -350,7 +351,7 @@ export default function ReadPage() {
                   onChange={(event) => setManualUrl(event.target.value)}
                   placeholder="Original URL (optional)"
                   disabled={loading}
-                  className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary/50"
+                  className="glass-input w-full rounded-xl px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary/40"
                 />
               </div>
               <textarea
@@ -359,12 +360,12 @@ export default function ReadPage() {
                 placeholder="Paste the article text here. Leave blank lines between paragraphs if possible."
                 required
                 disabled={loading}
-                className="min-h-40 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary/50"
+                className="glass-input min-h-40 w-full rounded-xl px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary/40"
               />
               <button
                 type="submit"
                 disabled={loading || !manualTitle.trim() || !manualText.trim()}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
+                className="glow-button flex w-full items-center justify-center gap-2 rounded-xl py-3.5 font-medium text-primary-foreground transition hover:opacity-95 disabled:opacity-50"
               >
                 {loading ? (
                   <>
@@ -397,7 +398,7 @@ export default function ReadPage() {
             <span className="text-xs text-muted">{continueReading.length} in progress</span>
           </div>
           {continueReading.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border bg-card p-5 text-center">
+            <div className="glass-panel rounded-2xl p-5 text-center">
               <p className="font-medium">No active article yet</p>
               <p className="mt-1 text-sm text-muted">
                 Imported articles will show up here so you can jump back in quickly.
@@ -410,11 +411,11 @@ export default function ReadPage() {
 
                 return (
                   <button
-                    key={item.article_id}
-                    type="button"
-                    onClick={() => router.push(`/read/${item.article_id}`)}
-                    className="w-full rounded-2xl border border-border bg-card p-4 text-left transition active:scale-[0.98]"
-                  >
+                  key={item.article_id}
+                  type="button"
+                  onClick={() => router.push(`/read/${item.article_id}`)}
+                  className="glass-panel w-full rounded-2xl p-4 text-left transition active:scale-[0.98]"
+                >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-xs uppercase tracking-wide text-primary">
@@ -424,7 +425,7 @@ export default function ReadPage() {
                           {articleMeta?.title ?? "Untitled article"}
                         </p>
                       </div>
-                      <span className="rounded-full border border-border px-3 py-1 text-xs text-muted">
+                      <span className="glass-chip rounded-full px-3 py-1 text-xs text-muted">
                         Resume
                       </span>
                     </div>
@@ -446,7 +447,7 @@ export default function ReadPage() {
             <span className="text-xs text-muted">{offlineArticles.length} cached</span>
           </div>
           {offlineArticles.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border bg-card p-5 text-center">
+            <div className="glass-panel rounded-2xl p-5 text-center">
               <p className="font-medium">No offline copies yet</p>
               <p className="mt-1 text-sm text-muted">
                 Turn on offline mode in settings, then open articles to cache them.
@@ -459,7 +460,7 @@ export default function ReadPage() {
                   key={article.id}
                   type="button"
                   onClick={() => router.push(`/read/offline/${article.id}`)}
-                  className="w-full rounded-2xl border border-border bg-card p-4 text-left transition active:scale-[0.98]"
+                  className="glass-panel w-full rounded-2xl p-4 text-left transition active:scale-[0.98]"
                 >
                   <p className="text-xs uppercase tracking-wide text-primary">
                     {article.source_name}

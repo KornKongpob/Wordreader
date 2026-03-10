@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Loader2, Search, SlidersHorizontal, Star } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getOfflineVocabulary, saveOfflineVocabulary } from "@/lib/offline";
 import VocabCard from "./VocabCard";
-import { Loader2, Search, SlidersHorizontal, Star } from "lucide-react";
 
 interface VocabItem {
   id: string;
@@ -166,9 +166,27 @@ export default function VocabList() {
     return result;
   }, [diffFilter, dueOnly, folderFilter, items, search, sort, sourceFilter, starredOnly]);
 
+  const hasActiveFilters =
+    search.trim().length > 0 ||
+    diffFilter !== "all" ||
+    sourceFilter !== "all" ||
+    folderFilter !== "all" ||
+    starredOnly ||
+    dueOnly;
+
+  const resetFilters = () => {
+    setSearch("");
+    setSort("newest");
+    setDiffFilter("all");
+    setSourceFilter("all");
+    setFolderFilter("all");
+    setStarredOnly(false);
+    setDueOnly(false);
+  };
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16">
+      <div className="glass-panel flex items-center justify-center rounded-[1.75rem] py-16">
         <Loader2 size={24} className="animate-spin text-muted" />
       </div>
     );
@@ -176,43 +194,68 @@ export default function VocabList() {
 
   return (
     <div className="space-y-4">
-      <div className="relative">
-        <Search
-          size={18}
-          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted"
-        />
-        <input
-          type="text"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search words, notes, or tags..."
-          className="w-full rounded-xl border border-border bg-background py-3 pl-10 pr-12 text-[16px] text-foreground outline-none transition focus:ring-2 focus:ring-primary/50"
-        />
-        <button
-          type="button"
-          onClick={() => setShowFilters((current) => !current)}
-          className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 transition ${
-            showFilters ? "bg-primary/10 text-primary" : "text-muted"
-          }`}
-        >
-          <SlidersHorizontal size={18} />
-        </button>
+      <div className="glass-panel rounded-[1.75rem] p-4">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <p className="editorial-label mb-1">Find And Organize</p>
+            <p className="text-sm text-muted">
+              Search by meaning, source, note, folder, or review urgency.
+            </p>
+          </div>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="glass-chip rounded-full px-3 py-1.5 text-xs font-medium text-muted transition hover:text-foreground"
+            >
+              Reset
+            </button>
+          )}
+        </div>
+
+        <div className="relative">
+          <Search
+            size={18}
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-muted"
+          />
+          <input
+            type="text"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search words, notes, or tags..."
+            className="glass-input w-full rounded-[1.35rem] py-3.5 pl-11 pr-24 text-[16px] text-foreground outline-none transition focus:ring-2 focus:ring-primary/35"
+          />
+          <button
+            type="button"
+            onClick={() => setShowFilters((current) => !current)}
+            className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-full px-3 py-2 text-xs font-medium transition ${
+              showFilters
+                ? "glow-button text-primary-foreground"
+                : "glass-chip text-muted hover:text-foreground"
+            }`}
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <SlidersHorizontal size={16} />
+              Filters
+            </span>
+          </button>
+        </div>
       </div>
 
       {showFilters && (
-        <div className="space-y-4 rounded-2xl border border-border bg-card p-4">
+        <div className="glass-panel space-y-4 rounded-[1.75rem] p-4">
           <div>
-            <p className="mb-2 text-xs text-muted">Difficulty</p>
+            <p className="editorial-label mb-2">Difficulty</p>
             <div className="flex flex-wrap gap-2">
               {(["all", "easy", "medium", "hard"] as DifficultyFilter[]).map((value) => (
                 <button
                   key={value}
                   type="button"
                   onClick={() => setDiffFilter(value)}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
                     diffFilter === value
-                      ? "bg-primary text-primary-foreground"
-                      : "border border-border text-muted"
+                      ? "glow-button text-primary-foreground"
+                      : "glass-chip text-muted hover:text-foreground"
                   }`}
                 >
                   {value === "all" ? "All" : value}
@@ -222,15 +265,15 @@ export default function VocabList() {
           </div>
 
           <div>
-            <p className="mb-2 text-xs text-muted">Quick filters</p>
+            <p className="editorial-label mb-2">Quick Filters</p>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => setStarredOnly((current) => !current)}
-                className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium transition ${
                   starredOnly
-                    ? "bg-primary text-primary-foreground"
-                    : "border border-border text-muted"
+                    ? "glow-button text-primary-foreground"
+                    : "glass-chip text-muted hover:text-foreground"
                 }`}
               >
                 <Star size={12} />
@@ -239,10 +282,10 @@ export default function VocabList() {
               <button
                 type="button"
                 onClick={() => setDueOnly((current) => !current)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
                   dueOnly
-                    ? "bg-primary text-primary-foreground"
-                    : "border border-border text-muted"
+                    ? "glow-button text-primary-foreground"
+                    : "glass-chip text-muted hover:text-foreground"
                 }`}
               >
                 Due now
@@ -250,13 +293,13 @@ export default function VocabList() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="space-y-2">
-              <span className="text-xs text-muted">Source</span>
+              <span className="editorial-label">Source</span>
               <select
                 value={sourceFilter}
                 onChange={(event) => setSourceFilter(event.target.value)}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"
+                className="glass-input w-full rounded-[1.15rem] px-3 py-2.5 text-sm outline-none"
               >
                 <option value="all">All sources</option>
                 {availableSources.map((source) => (
@@ -267,11 +310,11 @@ export default function VocabList() {
               </select>
             </label>
             <label className="space-y-2">
-              <span className="text-xs text-muted">Folder</span>
+              <span className="editorial-label">Folder</span>
               <select
                 value={folderFilter}
                 onChange={(event) => setFolderFilter(event.target.value)}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"
+                className="glass-input w-full rounded-[1.15rem] px-3 py-2.5 text-sm outline-none"
               >
                 <option value="all">All folders</option>
                 {availableFolders.map((folder) => (
@@ -284,8 +327,8 @@ export default function VocabList() {
           </div>
 
           <div>
-            <p className="mb-2 text-xs text-muted">Sort</p>
-            <div className="flex gap-2">
+            <p className="editorial-label mb-2">Sort</p>
+            <div className="flex flex-wrap gap-2">
               {([
                 ["newest", "Newest"],
                 ["oldest", "Oldest"],
@@ -295,10 +338,10 @@ export default function VocabList() {
                   key={value}
                   type="button"
                   onClick={() => setSort(value)}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
                     sort === value
-                      ? "bg-primary text-primary-foreground"
-                      : "border border-border text-muted"
+                      ? "glow-button text-primary-foreground"
+                      : "glass-chip text-muted hover:text-foreground"
                   }`}
                 >
                   {label}
@@ -309,15 +352,20 @@ export default function VocabList() {
         </div>
       )}
 
-      <p className="text-xs text-muted">
-        {filtered.length} word{filtered.length !== 1 ? "s" : ""}
-        {search || diffFilter !== "all" || sourceFilter !== "all" || folderFilter !== "all" || starredOnly || dueOnly
-          ? " found"
-          : " saved"}
-      </p>
+      <div className="flex items-center justify-between gap-3 px-1">
+        <p className="editorial-label">
+          {filtered.length} word{filtered.length !== 1 ? "s" : ""}
+          {hasActiveFilters ? " found" : " saved"}
+        </p>
+        {items.length > 0 && (
+          <span className="text-xs text-muted">
+            {dueOnly ? "Only showing words due now." : "Tap a word for notes and context."}
+          </span>
+        )}
+      </div>
 
       {filtered.length === 0 ? (
-        <div className="py-12 text-center">
+        <div className="glass-panel rounded-[1.75rem] px-5 py-10 text-center">
           <p className="text-sm text-muted">
             {items.length === 0
               ? "No words saved yet. Start reading to build your vocabulary."

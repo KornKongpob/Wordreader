@@ -350,10 +350,10 @@ export default function ReaderView({ article }: ReaderViewProps) {
       />
 
       <article className="flex-1 px-5 py-6 max-w-2xl mx-auto w-full">
-        <header className="mb-6">
+        <header className="glass-panel mb-6 rounded-[2rem] p-5">
           <div className="mb-4 flex flex-wrap items-center gap-2">
             {savedWords.length > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+              <span className="glass-chip inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium text-primary">
                 <BookMarked size={12} />
                 {savedWords.length} saved words highlighted
               </span>
@@ -362,7 +362,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
               <button
                 type="button"
                 onClick={handleResume}
-                className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-xs font-medium text-muted hover:text-foreground"
+                className="glass-chip inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium text-muted hover:text-foreground"
               >
                 <RotateCcw size={12} />
                 Resume where you left off
@@ -370,15 +370,18 @@ export default function ReaderView({ article }: ReaderViewProps) {
             )}
           </div>
 
+          <p className="editorial-label mb-2">Reader View</p>
           <h1
-            className="font-bold leading-tight mb-3"
+            className="font-bold leading-tight mb-3 tracking-tight"
             style={{ fontSize: fontSize + 6 }}
           >
             {article.title}
           </h1>
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
-            <span className="font-medium text-primary">{article.source_name}</span>
+            <span className="glass-chip rounded-full px-3 py-1 text-xs font-medium text-primary">
+              {article.source_name}
+            </span>
             {article.author && <span>{article.author}</span>}
             {formattedDate && <span>{formattedDate}</span>}
           </div>
@@ -394,28 +397,32 @@ export default function ReaderView({ article }: ReaderViewProps) {
         </header>
 
         {article.image_url && (
-          <div className="mb-6 -mx-5 sm:mx-0 sm:rounded-xl overflow-hidden">
+          <div className="glass-panel mb-6 overflow-hidden rounded-[1.6rem] p-2">
             <Image
               src={article.image_url}
               alt={article.title}
               width={1200}
               height={675}
               sizes="(max-width: 640px) 100vw, 768px"
-              className="w-full h-auto object-cover max-h-80"
+              className="w-full h-auto object-cover max-h-80 rounded-[1.2rem]"
               unoptimized
             />
           </div>
         )}
 
         <div
-          ref={contentRef}
-          className="article-content prose dark:prose-invert max-w-none"
-          style={{
-            fontSize: `${fontSize}px`,
-            lineHeight: lineSpacing,
-          }}
-          dangerouslySetInnerHTML={{ __html: renderedContent }}
-        />
+          className="reader-paper rounded-[2rem] px-5 py-6 sm:px-8"
+        >
+          <div
+            ref={contentRef}
+            className="article-content prose dark:prose-invert max-w-none"
+            style={{
+              fontSize: `${fontSize}px`,
+              lineHeight: lineSpacing,
+            }}
+            dangerouslySetInnerHTML={{ __html: renderedContent }}
+          />
+        </div>
 
         <ArticleNotes articleId={article.id} />
         <ArticleQuiz
@@ -430,7 +437,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
           <div className="mx-4 mb-4 max-w-lg mx-auto">
             <button
               onClick={handleOpenPopup}
-              className="w-full py-3.5 rounded-2xl bg-primary text-primary-foreground font-medium shadow-lg shadow-primary/25 flex items-center justify-center gap-2 active:scale-[0.98] transition"
+              className="glow-button w-full py-3.5 rounded-2xl text-primary-foreground font-medium shadow-lg shadow-primary/25 flex items-center justify-center gap-2 active:scale-[0.98] transition"
             >
               {lookupMode === "word" ? "Look up" : "Explore"} &ldquo;
               {selection.text.length > 30 ? `${selection.text.slice(0, 30)}...` : selection.text}

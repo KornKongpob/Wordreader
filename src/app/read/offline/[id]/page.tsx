@@ -20,19 +20,24 @@ export default function OfflineArticlePage() {
   if (!article) {
     return (
       <div className="mx-auto flex min-h-dvh max-w-lg flex-col items-center justify-center px-5 text-center">
-        <div className="mb-4 rounded-2xl bg-primary/10 p-4 text-primary">
-          <BookOpenText size={28} />
+        <div className="glass-panel-strong w-full rounded-[2rem] p-6">
+          <div className="glass-chip mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[1.4rem] text-primary">
+            <BookOpenText size={28} />
+          </div>
+          <p className="editorial-label mb-2">Offline Library</p>
+          <h1 className="text-xl font-semibold tracking-[-0.02em]">
+            Offline copy not found
+          </h1>
+          <p className="mt-2 text-sm text-muted">
+            This article may have been removed from your local cache.
+          </p>
+          <Link
+            href="/read"
+            className="glow-button mt-5 inline-flex rounded-full px-4 py-2.5 text-sm font-medium text-primary-foreground"
+          >
+            Back to library
+          </Link>
         </div>
-        <h1 className="text-xl font-bold">Offline copy not found</h1>
-        <p className="mt-2 text-sm text-muted">
-          This article may have been removed from your local cache.
-        </p>
-        <Link
-          href="/read"
-          className="mt-5 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-        >
-          Back to library
-        </Link>
       </div>
     );
   }

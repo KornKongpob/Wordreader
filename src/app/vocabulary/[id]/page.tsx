@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import AppShell from "@/components/layout/AppShell";
-import SpeakButton from "@/components/common/SpeakButton";
 import {
   ArrowLeft,
   Bookmark,
@@ -15,7 +13,9 @@ import {
   Star,
   Trash2,
 } from "lucide-react";
-import Link from "next/link";
+import AppShell from "@/components/layout/AppShell";
+import SpeakButton from "@/components/common/SpeakButton";
+import { createClient } from "@/lib/supabase/client";
 
 interface VocabDetail {
   id: string;
@@ -68,6 +68,13 @@ interface ContextRow {
   article_id: string;
 }
 
+interface ArticleSummary {
+  id: string;
+  title: string;
+  url: string;
+  source_name: string;
+}
+
 export default function VocabularyDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -117,26 +124,34 @@ export default function VocabularyDetailPage() {
 
       const { data: contextData } = await supabase
         .from("vocabulary_contexts")
-        .select("id, original_sentence, contextual_meaning, context_explanation, created_at, article_id")
+        .select(
+          "id, original_sentence, contextual_meaning, context_explanation, created_at, article_id"
+        )
         .eq("vocabulary_item_id", id)
         .order("created_at", { ascending: false });
 
       if (contextData) {
-        const contextWithArticles = await Promise.all(
-          (contextData as ContextRow[]).map(async (contextRow) => {
-            const { data: articleData } = await supabase
-              .from("articles")
-              .select("id, title, url, source_name")
-              .eq("id", contextRow.article_id)
-              .single();
+        const contextRows = contextData as ContextRow[];
+        const articleIds = [...new Set(contextRows.map((contextRow) => contextRow.article_id))];
+        let articleMap = new Map<string, ArticleSummary>();
 
-            return {
-              ...contextRow,
-              article: articleData,
-            } as VocabContext;
-          })
+        if (articleIds.length > 0) {
+          const { data: articleRows } = await supabase
+            .from("articles")
+            .select("id, title, url, source_name")
+            .in("id", articleIds);
+
+          articleMap = new Map(
+            ((articleRows ?? []) as ArticleSummary[]).map((article) => [article.id, article])
+          );
+        }
+
+        setContexts(
+          contextRows.map((contextRow) => ({
+            ...contextRow,
+            article: articleMap.get(contextRow.article_id) ?? null,
+          }))
         );
-        setContexts(contextWithArticles);
       }
 
       if (user) {
@@ -171,8 +186,10 @@ export default function VocabularyDetailPage() {
   }, [id]);
 
   const handleSaveDetails = async () => {
+    if (!item) return;
+
     const supabase = createClient();
-    if (!supabase || !item) return;
+    if (!supabase) return;
 
     setSaving(true);
 
@@ -181,6 +198,8 @@ export default function VocabularyDetailPage() {
       .map((tag) => tag.trim())
       .filter(Boolean);
 
+    const updatedAt = new Date().toISOString();
+
     await supabase
       .from("vocabulary_items")
       .update({
@@ -188,7 +207,7 @@ export default function VocabularyDetailPage() {
         tags: nextTags,
         notes,
         starred,
-        updated_at: new Date().toISOString(),
+        updated_at: updatedAt,
       })
       .eq("id", id);
 
@@ -198,7 +217,7 @@ export default function VocabularyDetailPage() {
       tags: nextTags,
       notes,
       starred,
-      updated_at: new Date().toISOString(),
+      updated_at: updatedAt,
     });
 
     setSaving(false);
@@ -209,7 +228,11 @@ export default function VocabularyDetailPage() {
     setDeleting(true);
 
     const supabase = createClient();
-    if (!supabase) return;
+    if (!supabase) {
+      setDeleting(false);
+      return;
+    }
+
     await supabase.from("vocabulary_items").delete().eq("id", id);
 
     router.push("/vocabulary");
@@ -235,11 +258,16 @@ export default function VocabularyDetailPage() {
   if (!item) {
     return (
       <AppShell>
-        <div className="mx-auto max-w-lg px-5 py-6 text-center">
-          <p className="text-muted">Word not found.</p>
-          <Link href="/vocabulary" className="mt-2 inline-block text-sm text-primary">
-            Back to vocabulary
-          </Link>
+        <div className="mx-auto max-w-lg px-5 py-6">
+          <div className="glass-panel rounded-[1.75rem] px-5 py-10 text-center">
+            <p className="text-muted">Word not found.</p>
+            <Link
+              href="/vocabulary"
+              className="glass-chip mt-4 inline-flex rounded-full px-3 py-1.5 text-sm text-primary"
+            >
+              Back to vocabulary
+            </Link>
+          </div>
         </div>
       </AppShell>
     );
@@ -249,33 +277,36 @@ export default function VocabularyDetailPage() {
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-lg px-5 py-6">
+      <div className="mx-auto max-w-xl px-5 py-6 space-y-5">
         <Link
           href="/vocabulary"
-          className="mb-4 inline-flex items-center gap-1 text-sm text-muted transition hover:text-foreground"
+          className="glass-chip inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm text-muted transition hover:text-foreground"
         >
           <ArrowLeft size={16} />
           Back
         </Link>
 
-        <div className="mb-6 rounded-[2rem] border border-border bg-card p-5">
+        <section className="glass-hero rounded-[2rem] p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="mb-1 flex items-center gap-2">
-                <h1 className="text-2xl font-bold">{item.word}</h1>
+              <p className="editorial-label mb-2">Vocabulary Spotlight</p>
+              <div className="mb-2 flex items-center gap-2">
+                <h1 className="text-3xl font-semibold tracking-[-0.03em]">{item.word}</h1>
                 {starred && <Star size={16} className="fill-warning text-warning" />}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {item.part_of_speech && (
-                  <span className="text-sm italic text-muted">{item.part_of_speech}</span>
+                  <span className="glass-chip rounded-full px-3 py-1 text-sm italic text-muted">
+                    {item.part_of_speech}
+                  </span>
                 )}
                 <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${difficultyColor[item.difficulty]}`}
+                  className={`rounded-full px-3 py-1 text-xs font-medium ${difficultyColor[item.difficulty]}`}
                 >
                   {item.difficulty}
                 </span>
                 {dueNow && (
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                  <span className="glass-chip rounded-full px-3 py-1 text-xs font-medium text-primary">
                     Due now
                   </span>
                 )}
@@ -285,7 +316,8 @@ export default function VocabularyDetailPage() {
               type="button"
               onClick={handleDelete}
               disabled={deleting}
-              className="p-2 text-muted transition hover:text-danger"
+              className="subtle-button rounded-full p-2 text-muted transition hover:text-danger disabled:opacity-60"
+              aria-label="Delete vocabulary item"
             >
               <Trash2 size={18} />
             </button>
@@ -297,33 +329,36 @@ export default function VocabularyDetailPage() {
               <SpeakButton text={contexts[0].original_sentence} label="Latest sentence" />
             )}
             {item.last_source_name && (
-              <span className="rounded-full bg-background px-3 py-1 text-xs text-muted">
+              <span className="glass-chip rounded-full px-3 py-1.5 text-xs text-muted">
                 {item.last_source_name}
               </span>
             )}
           </div>
-        </div>
+        </section>
 
-        <div className="mb-6 space-y-3">
-          <div className="rounded-2xl border border-border bg-card p-4">
-            <p className="mb-1 text-xs uppercase tracking-wide text-muted">Thai</p>
-            <p className="text-lg">{item.thai_meaning}</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="glass-panel rounded-[1.75rem] p-4">
+            <p className="editorial-label mb-2">Thai Meaning</p>
+            <p className="text-lg font-medium">{item.thai_meaning}</p>
           </div>
 
-          <div className="rounded-2xl border border-border bg-card p-4">
-            <p className="mb-1 text-xs uppercase tracking-wide text-muted">English</p>
-            <p className="text-sm">{item.english_meaning}</p>
+          <div className="glass-panel rounded-[1.75rem] p-4">
+            <p className="editorial-label mb-2">English Meaning</p>
+            <p className="text-sm leading-relaxed">{item.english_meaning}</p>
           </div>
         </div>
 
-        <section className="mb-6 rounded-2xl border border-border bg-card p-4">
+        <section className="glass-panel rounded-[1.75rem] p-4">
           <div className="mb-3 flex items-center gap-2">
             <Bookmark size={16} className="text-primary" />
-            <h2 className="font-medium">Organization</h2>
+            <div>
+              <p className="editorial-label mb-1">Organization</p>
+              <h2 className="font-medium">Keep this word easy to find</h2>
+            </div>
           </div>
 
           <div className="space-y-3">
-            <div className="flex items-center justify-between rounded-xl bg-background px-3 py-3">
+            <div className="glass-chip flex items-center justify-between rounded-[1.35rem] px-4 py-3">
               <div className="flex items-start gap-2">
                 <FolderOpen size={16} className="mt-0.5 text-muted" />
                 <div>
@@ -334,8 +369,10 @@ export default function VocabularyDetailPage() {
               <button
                 type="button"
                 onClick={() => setStarred((current) => !current)}
-                className={`rounded-full px-3 py-1 text-xs font-medium ${
-                  starred ? "bg-primary text-primary-foreground" : "border border-border text-muted"
+                className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                  starred
+                    ? "glow-button text-primary-foreground"
+                    : "subtle-button text-muted hover:text-foreground"
                 }`}
               >
                 {starred ? "Starred" : "Star"}
@@ -343,34 +380,34 @@ export default function VocabularyDetailPage() {
             </div>
 
             <label className="block">
-              <span className="mb-2 block text-xs text-muted">Folder</span>
+              <span className="editorial-label mb-2 block">Folder</span>
               <input
                 type="text"
                 value={folderName}
                 onChange={(event) => setFolderName(event.target.value)}
                 placeholder="General"
-                className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                className="glass-input w-full rounded-[1.2rem] px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/35"
               />
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-xs text-muted">Tags</span>
+              <span className="editorial-label mb-2 block">Tags</span>
               <input
                 type="text"
                 value={tagInput}
                 onChange={(event) => setTagInput(event.target.value)}
                 placeholder="news, health, business"
-                className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                className="glass-input w-full rounded-[1.2rem] px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/35"
               />
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-xs text-muted">Notes</span>
+              <span className="editorial-label mb-2 block">Notes</span>
               <textarea
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
                 placeholder="Write your own example sentence or memory trick."
-                className="min-h-28 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                className="glass-input min-h-28 w-full rounded-[1.2rem] px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/35"
               />
             </label>
 
@@ -378,7 +415,7 @@ export default function VocabularyDetailPage() {
               type="button"
               onClick={() => void handleSaveDetails()}
               disabled={saving}
-              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+              className="glow-button inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
             >
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
               Save changes
@@ -387,11 +424,12 @@ export default function VocabularyDetailPage() {
         </section>
 
         {reviewState && (
-          <section className="mb-6 rounded-2xl border border-border bg-card p-4">
-            <h2 className="mb-3 font-medium">Review status</h2>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-xl bg-background px-3 py-3">
-                <p className="text-xs uppercase tracking-wide text-muted">Next review</p>
+          <section className="glass-panel rounded-[1.75rem] p-4">
+            <p className="editorial-label mb-1">Review Status</p>
+            <h2 className="mb-3 font-medium">When this word comes back</h2>
+            <div className="grid gap-3 text-sm sm:grid-cols-3">
+              <div className="glass-chip rounded-[1.2rem] px-3 py-3">
+                <p className="editorial-label">Next Review</p>
                 <p className="mt-2 font-medium">
                   {dueNow
                     ? "Due now"
@@ -401,20 +439,24 @@ export default function VocabularyDetailPage() {
                       })}
                 </p>
               </div>
-              <div className="rounded-xl bg-background px-3 py-3">
-                <p className="text-xs uppercase tracking-wide text-muted">Repetitions</p>
+              <div className="glass-chip rounded-[1.2rem] px-3 py-3">
+                <p className="editorial-label">Repetitions</p>
                 <p className="mt-2 font-medium">{reviewState.repetitions}</p>
+              </div>
+              <div className="glass-chip rounded-[1.2rem] px-3 py-3">
+                <p className="editorial-label">Interval</p>
+                <p className="mt-2 font-medium">{reviewState.interval_days} day(s)</p>
               </div>
             </div>
 
             {reviewEvents.length > 0 && (
               <div className="mt-4">
-                <p className="mb-2 text-xs uppercase tracking-wide text-muted">Recent ratings</p>
+                <p className="editorial-label mb-2">Recent Ratings</p>
                 <div className="space-y-2">
                   {reviewEvents.map((event) => (
                     <div
                       key={`${event.reviewed_at}-${event.rating}`}
-                      className="flex items-center justify-between rounded-xl bg-background px-3 py-2 text-sm"
+                      className="glass-chip flex items-center justify-between rounded-[1.15rem] px-3 py-2 text-sm"
                     >
                       <span className="font-medium capitalize">{event.rating}</span>
                       <span className="text-xs text-muted">
@@ -432,15 +474,13 @@ export default function VocabularyDetailPage() {
         )}
 
         {contexts.length > 0 && (
-          <section className="mb-6">
-            <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted">
-              Contexts ({contexts.length})
-            </h2>
+          <section>
+            <h2 className="editorial-label mb-3">Contexts ({contexts.length})</h2>
             <div className="space-y-3">
               {contexts.map((context) => (
                 <div
                   key={context.id}
-                  className="space-y-2 rounded-2xl border border-border bg-card p-4"
+                  className="glass-panel space-y-3 rounded-[1.75rem] p-4"
                 >
                   <p className="text-sm italic leading-relaxed">
                     &ldquo;{context.original_sentence}&rdquo;
@@ -452,21 +492,27 @@ export default function VocabularyDetailPage() {
                     </p>
                   )}
                   {context.context_explanation && (
-                    <p className="text-xs text-muted">{context.context_explanation}</p>
+                    <p className="text-xs leading-relaxed text-muted">
+                      {context.context_explanation}
+                    </p>
                   )}
                   {context.article && (
-                    <div className="flex items-center gap-1 pt-1">
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
                       <Link
                         href={`/read/${context.article.id}`}
-                        className="truncate text-xs text-primary hover:underline"
+                        className="glass-chip truncate rounded-full px-3 py-1.5 text-xs text-primary transition hover:text-foreground"
                       >
                         {context.article.title}
                       </Link>
+                      <span className="glass-chip rounded-full px-3 py-1.5 text-xs text-muted">
+                        {context.article.source_name}
+                      </span>
                       <a
                         href={context.article.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-muted hover:text-primary"
+                        className="glass-chip rounded-full px-2 py-2 text-muted transition hover:text-primary"
+                        aria-label="Open original article"
                       >
                         <ExternalLink size={10} />
                       </a>
@@ -478,7 +524,7 @@ export default function VocabularyDetailPage() {
           </section>
         )}
 
-        <div className="space-y-1 text-xs text-muted">
+        <div className="glass-chip inline-flex flex-col gap-1 rounded-[1.2rem] px-4 py-3 text-xs text-muted">
           <p>
             Added:{" "}
             {new Date(item.created_at).toLocaleDateString("en-US", {

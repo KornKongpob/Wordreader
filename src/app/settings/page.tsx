@@ -223,15 +223,16 @@ export default function SettingsPage() {
   return (
     <AppShell>
       <div className="mx-auto max-w-lg px-5 py-6">
+        <p className="editorial-label mb-2">Workspace Controls</p>
         <h1 className="mb-6 text-xl font-bold">Settings</h1>
 
         <section className="mb-8">
           <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted">
             Account
           </h2>
-          <div className="rounded-2xl border border-border bg-card p-4">
+          <div className="glass-panel rounded-2xl p-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+              <div className="glass-chip flex h-10 w-10 items-center justify-center rounded-full text-primary">
                 <User size={18} className="text-primary" />
               </div>
               <div className="min-w-0 flex-1">
@@ -256,10 +257,10 @@ export default function SettingsPage() {
               <button
                 key={value}
                 onClick={() => setTheme(value)}
-                className={`flex flex-col items-center gap-2 rounded-xl border p-4 transition ${
+                className={`flex flex-col items-center gap-2 rounded-xl p-4 transition ${
                   theme === value
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border bg-card text-muted"
+                    ? "glass-chip text-primary"
+                    : "glass-panel text-muted"
                 }`}
               >
                 <Icon size={20} />
@@ -273,7 +274,7 @@ export default function SettingsPage() {
           <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted">
             Reading defaults
           </h2>
-          <div className="space-y-4 rounded-2xl border border-border bg-card p-4">
+          <div className="glass-panel space-y-4 rounded-2xl p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <BookOpen size={16} className="text-muted" />
@@ -283,7 +284,7 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={() => handleFontSizeChange(Math.max(14, defaultFontSize - 2))}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted transition hover:text-foreground"
+                  className="subtle-button flex h-8 w-8 items-center justify-center rounded-lg text-muted transition hover:text-foreground"
                 >
                   <Minus size={14} />
                 </button>
@@ -291,7 +292,7 @@ export default function SettingsPage() {
                 <button
                   type="button"
                   onClick={() => handleFontSizeChange(Math.min(28, defaultFontSize + 2))}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted transition hover:text-foreground"
+                  className="subtle-button flex h-8 w-8 items-center justify-center rounded-lg text-muted transition hover:text-foreground"
                 >
                   <Plus size={14} />
                 </button>
@@ -308,8 +309,8 @@ export default function SettingsPage() {
                     onClick={() => handleLineSpacingChange(value)}
                     className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
                       defaultLineSpacing === value
-                        ? "bg-primary text-primary-foreground"
-                        : "border border-border text-muted"
+                        ? "glow-button text-primary-foreground"
+                        : "subtle-button text-muted"
                     }`}
                   >
                     {value}
@@ -328,8 +329,8 @@ export default function SettingsPage() {
                     onClick={() => handleLookupModeChange(mode)}
                     className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
                       lookupMode === mode
-                        ? "bg-primary text-primary-foreground"
-                        : "border border-border text-muted"
+                        ? "glow-button text-primary-foreground"
+                        : "subtle-button text-muted"
                     }`}
                   >
                     {mode === "word" ? "Single word" : "Phrase"}
@@ -344,7 +345,7 @@ export default function SettingsPage() {
           <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted">
             Practice
           </h2>
-          <div className="space-y-4 rounded-2xl border border-border bg-card p-4">
+          <div className="glass-panel space-y-4 rounded-2xl p-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-start gap-2">
                 <RotateCcw size={16} className="mt-0.5 text-primary" />
@@ -361,7 +362,7 @@ export default function SettingsPage() {
                     setReviewGoal(next);
                     void saveSettings({ review_goal: next });
                   }}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted"
+                  className="subtle-button flex h-8 w-8 items-center justify-center rounded-lg text-muted"
                 >
                   <Minus size={14} />
                 </button>
@@ -373,7 +374,7 @@ export default function SettingsPage() {
                     setReviewGoal(next);
                     void saveSettings({ review_goal: next });
                   }}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted"
+                  className="subtle-button flex h-8 w-8 items-center justify-center rounded-lg text-muted"
                 >
                   <Plus size={14} />
                 </button>
@@ -386,7 +387,7 @@ export default function SettingsPage() {
           <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted">
             Offline & reminders
           </h2>
-          <div className="space-y-4 rounded-2xl border border-border bg-card p-4">
+          <div className="glass-panel space-y-4 rounded-2xl p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-2">
                 <Cloud size={16} className="mt-0.5 text-primary" />
@@ -406,8 +407,8 @@ export default function SettingsPage() {
                 }}
                 className={`rounded-full px-3 py-1 text-xs font-medium ${
                   enableOffline
-                    ? "bg-primary text-primary-foreground"
-                    : "border border-border text-muted"
+                    ? "glow-button text-primary-foreground"
+                    : "glass-chip text-muted"
                 }`}
               >
                 {enableOffline ? "On" : "Off"}
@@ -429,8 +430,8 @@ export default function SettingsPage() {
                 onClick={() => void handleToggleNotifications()}
                 className={`rounded-full px-3 py-1 text-xs font-medium ${
                   enableNotifications
-                    ? "bg-primary text-primary-foreground"
-                    : "border border-border text-muted"
+                    ? "glow-button text-primary-foreground"
+                    : "glass-chip text-muted"
                 }`}
               >
                 {enableNotifications ? "On" : "Off"}
@@ -449,7 +450,7 @@ export default function SettingsPage() {
                   setReminderHour(next);
                   void saveSettings({ reminder_hour: next });
                 }}
-                className="rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"
+                className="glass-input rounded-xl px-3 py-2 text-sm outline-none"
               >
                 {reminderOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -465,7 +466,7 @@ export default function SettingsPage() {
           <button
             type="button"
             onClick={handleSignOut}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-danger/30 p-4 text-danger transition hover:bg-danger/10"
+            className="glass-panel flex w-full items-center justify-center gap-2 rounded-xl p-4 text-danger transition hover:bg-danger/10"
           >
             <LogOut size={18} />
             <span className="font-medium">Sign out</span>

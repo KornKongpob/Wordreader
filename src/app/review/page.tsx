@@ -288,7 +288,7 @@ export default function ReviewPage() {
       <AppShell>
         <div className="mx-auto max-w-lg px-5 py-6">
           <h1 className="mb-2 text-xl font-bold">Review Flashcards</h1>
-          <div className="mb-6 rounded-2xl border border-border bg-card p-4">
+          <div className="glass-panel mb-6 rounded-2xl p-4">
             <div className="mb-2 flex items-center gap-2 text-sm text-primary">
               <Target size={16} />
               <span>Daily goal</span>
@@ -302,11 +302,11 @@ export default function ReviewPage() {
             <div className="mt-3 flex items-center justify-between text-sm text-muted">
               <span>{reviewedToday}/{reviewGoal} reviewed today</span>
               <span>{streak} day streak</span>
+              </div>
             </div>
-          </div>
 
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+            <div className="glass-chip mb-4 flex h-16 w-16 items-center justify-center rounded-2xl text-primary">
               <RotateCcw size={32} className="text-primary" />
             </div>
             <p className="font-medium mb-1">No words due right now</p>
@@ -318,13 +318,13 @@ export default function ReviewPage() {
             <div className="flex gap-3">
               <Link
                 href="/read"
-                className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+                className="glow-button rounded-xl px-4 py-2 text-sm font-medium text-primary-foreground"
               >
                 Read an article
               </Link>
               <Link
                 href="/vocabulary"
-                className="rounded-xl border border-border px-4 py-2 text-sm font-medium"
+                className="subtle-button rounded-xl px-4 py-2 text-sm font-medium"
               >
                 Organize words
               </Link>
@@ -340,14 +340,14 @@ export default function ReviewPage() {
       <AppShell>
         <div className="mx-auto max-w-lg px-5 py-6">
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-success/15">
+            <div className="glass-chip mb-4 flex h-16 w-16 items-center justify-center rounded-2xl text-success">
               <PartyPopper size={32} className="text-success" />
             </div>
             <p className="mb-1 text-xl font-bold">Session complete</p>
             <p className="mb-6 text-sm text-muted">
               You reviewed {sessionReviewed} card{sessionReviewed !== 1 ? "s" : ""} this session and reached {reviewedToday}/{reviewGoal} for today.
             </p>
-            <div className="mb-6 rounded-2xl border border-border bg-card p-4 text-left">
+            <div className="glass-panel mb-6 rounded-2xl p-4 text-left">
               <div className="mb-2 flex items-center gap-2 text-sm text-primary">
                 <Flame size={16} />
                 <span>Momentum</span>
@@ -357,13 +357,13 @@ export default function ReviewPage() {
             <div className="flex gap-3">
               <Link
                 href="/"
-                className="rounded-xl border border-border px-4 py-2 text-sm font-medium"
+                className="subtle-button rounded-xl px-4 py-2 text-sm font-medium"
               >
                 Home
               </Link>
               <Link
                 href="/read"
-                className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+                className="glow-button rounded-xl px-4 py-2 text-sm font-medium text-primary-foreground"
               >
                 Read more
               </Link>
@@ -379,19 +379,20 @@ export default function ReviewPage() {
   return (
     <AppShell>
       <div className="mx-auto max-w-lg px-5 py-6">
-        <div className="mb-6 rounded-[2rem] border border-border bg-card p-5">
+        <div className="glass-hero mb-6 rounded-[2rem] p-5">
+          <p className="editorial-label mb-2">Review Studio</p>
           <h1 className="text-xl font-bold">Review Flashcards</h1>
           <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
-            <div className="rounded-2xl bg-background px-3 py-3">
-              <p className="text-xs uppercase tracking-wide text-muted">Due now</p>
+            <div className="glass-panel rounded-2xl px-3 py-3">
+              <p className="editorial-label">Due now</p>
               <p className="mt-2 text-lg font-semibold">{cards.length - currentIndex}</p>
             </div>
-            <div className="rounded-2xl bg-background px-3 py-3">
-              <p className="text-xs uppercase tracking-wide text-muted">Today</p>
+            <div className="glass-panel rounded-2xl px-3 py-3">
+              <p className="editorial-label">Today</p>
               <p className="mt-2 text-lg font-semibold">{reviewedToday}/{reviewGoal}</p>
             </div>
-            <div className="rounded-2xl bg-background px-3 py-3">
-              <p className="text-xs uppercase tracking-wide text-muted">Streak</p>
+            <div className="glass-panel rounded-2xl px-3 py-3">
+              <p className="editorial-label">Streak</p>
               <p className="mt-2 text-lg font-semibold">{streak}d</p>
             </div>
           </div>

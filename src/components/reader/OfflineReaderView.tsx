@@ -67,33 +67,42 @@ export default function OfflineReaderView({ article }: OfflineReaderViewProps) {
         onLookupModeChange={handleLookupModeChange}
       />
 
-      <article className="mx-auto w-full max-w-2xl flex-1 px-5 py-6">
-        <div className="mb-6 rounded-2xl border border-border bg-card p-4">
+      <article className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 px-4 py-6 sm:px-5">
+        <div className="glass-panel rounded-[1.75rem] p-4">
           <div className="flex items-start gap-3">
-            <div className="rounded-xl bg-primary/10 p-2 text-primary">
+            <div className="glass-chip rounded-[1.1rem] p-2 text-primary">
               <CloudOff size={18} />
             </div>
             <div>
-              <p className="font-medium">Offline copy</p>
+              <p className="editorial-label mb-1">Offline Copy</p>
+              <p className="font-medium">Saved for focus reading</p>
               <p className="mt-1 text-sm text-muted">
-                This saved version stays readable without a network connection. Word lookup and sync features resume when you&apos;re back online.
+                This saved version stays readable without a network connection.
+                Word lookup and sync features resume when you&apos;re back online.
               </p>
             </div>
           </div>
         </div>
 
-        <header className="mb-6">
+        <header className="glass-panel rounded-[2rem] p-5 sm:p-6">
+          <p className="editorial-label mb-2">Saved Article</p>
           <h1
-            className="mb-3 font-bold leading-tight"
-            style={{ fontSize: fontSize + 6 }}
+            className="max-w-3xl font-semibold leading-tight tracking-[-0.03em]"
+            style={{ fontSize: fontSize + 8 }}
           >
             {article.title}
           </h1>
 
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
-            <span className="font-medium text-primary">{article.source_name}</span>
-            {article.author && <span>{article.author}</span>}
-            {formattedDate && <span>{formattedDate}</span>}
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted">
+            <span className="glass-chip rounded-full px-3 py-1.5 font-medium text-primary">
+              {article.source_name}
+            </span>
+            {article.author && (
+              <span className="glass-chip rounded-full px-3 py-1.5">{article.author}</span>
+            )}
+            {formattedDate && (
+              <span className="glass-chip rounded-full px-3 py-1.5">{formattedDate}</span>
+            )}
           </div>
 
           {!article.url.startsWith("wordreader://") && (
@@ -101,7 +110,7 @@ export default function OfflineReaderView({ article }: OfflineReaderViewProps) {
               href={article.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-2 inline-flex items-center gap-1 text-xs text-muted transition hover:text-primary"
+              className="glass-chip mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-muted transition hover:text-primary"
             >
               View original <ExternalLink size={12} />
             </a>
@@ -109,27 +118,29 @@ export default function OfflineReaderView({ article }: OfflineReaderViewProps) {
         </header>
 
         {article.image_url && (
-          <div className="mb-6 overflow-hidden sm:rounded-xl">
+          <div className="glass-panel overflow-hidden rounded-[1.8rem] p-2">
             <Image
               src={article.image_url}
               alt={article.title}
               width={1200}
               height={675}
               sizes="(max-width: 640px) 100vw, 768px"
-              className="h-auto max-h-80 w-full object-cover"
+              className="h-auto max-h-96 w-full rounded-[1.35rem] object-cover"
               unoptimized
             />
           </div>
         )}
 
-        <div
-          className="article-content prose max-w-none dark:prose-invert"
-          style={{
-            fontSize: `${fontSize}px`,
-            lineHeight: lineSpacing,
-          }}
-          dangerouslySetInnerHTML={{ __html: article.content }}
-        />
+        <div className="reader-paper rounded-[2rem] px-5 py-6 sm:px-8 sm:py-8">
+          <div
+            className="article-content max-w-none"
+            style={{
+              fontSize: `${fontSize}px`,
+              lineHeight: lineSpacing,
+            }}
+            dangerouslySetInnerHTML={{ __html: article.content }}
+          />
+        </div>
       </article>
     </div>
   );

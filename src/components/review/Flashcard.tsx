@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type KeyboardEvent } from "react";
 import { RotateCcw } from "lucide-react";
 import SpeakButton from "@/components/common/SpeakButton";
 
@@ -29,32 +29,44 @@ export default function Flashcard({
 }: FlashcardProps) {
   const [flipped, setFlipped] = useState(false);
 
+  const handleFlip = () => {
+    setFlipped((current) => !current);
+  };
+
+  const handleFlipKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      handleFlip();
+    }
+  };
+
   return (
-    <div className="flex flex-col items-center gap-6 w-full">
-      {/* Progress */}
-      <div className="w-full flex items-center gap-3">
-        <div className="flex-1 h-1.5 rounded-full bg-border overflow-hidden">
+    <div className="flex w-full flex-col items-center gap-6">
+      <div className="flex w-full items-center gap-3">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-primary/10">
           <div
-            className="h-full bg-primary rounded-full transition-all duration-300"
+            className="h-full rounded-full bg-primary transition-all duration-300"
             style={{ width: `${(current / total) * 100}%` }}
           />
         </div>
-        <span className="text-xs text-muted shrink-0">
+        <span className="shrink-0 text-xs text-muted">
           {current}/{total}
         </span>
       </div>
 
-      {/* Card */}
-      <button
-        onClick={() => setFlipped(!flipped)}
-        className="w-full min-h-[300px] p-6 rounded-2xl border border-border bg-card shadow-sm flex flex-col items-center justify-center text-center active:scale-[0.99] transition-transform"
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={handleFlip}
+        onKeyDown={handleFlipKeyDown}
+        className="glass-panel-strong flex min-h-[320px] w-full cursor-pointer flex-col items-center justify-center rounded-[2rem] p-6 text-center transition-transform active:scale-[0.99]"
       >
         {!flipped ? (
           <>
-            {/* Front — word + sentence */}
-            <p className="text-2xl font-bold mb-3">{word}</p>
+            <p className="editorial-label mb-3">Flashcard</p>
+            <p className="mb-3 text-2xl font-bold">{word}</p>
             {part_of_speech && (
-              <p className="text-sm text-muted italic mb-4">{part_of_speech}</p>
+              <p className="mb-4 text-sm italic text-muted">{part_of_speech}</p>
             )}
             <div className="mb-4 flex flex-wrap justify-center gap-2">
               <SpeakButton text={word} label="Word audio" />
@@ -63,7 +75,7 @@ export default function Flashcard({
               )}
             </div>
             {example_sentence && (
-              <p className="text-sm text-muted leading-relaxed max-w-sm">
+              <p className="max-w-sm text-sm leading-relaxed text-muted">
                 &ldquo;{example_sentence}&rdquo;
               </p>
             )}
@@ -72,31 +84,30 @@ export default function Flashcard({
               <span>Tap to reveal</span>
             </div>
           </>
-        ) : (
+            ) : (
           <>
-            {/* Back — meanings */}
-            <p className="text-lg font-bold mb-1">{word}</p>
-            <div className="w-12 h-0.5 rounded-full bg-border my-3" />
-            <p className="text-xl mb-2">{thai_meaning}</p>
-            <p className="text-sm text-muted mb-4">{english_meaning}</p>
+            <p className="editorial-label mb-2">Meaning</p>
+            <p className="mb-1 text-lg font-bold">{word}</p>
+            <div className="my-3 h-0.5 w-12 rounded-full bg-primary/20" />
+            <p className="mb-2 text-xl">{thai_meaning}</p>
+            <p className="mb-4 text-sm text-muted">{english_meaning}</p>
             {contextual_meaning && (
-              <p className="text-xs text-muted leading-relaxed max-w-sm">
+              <p className="max-w-sm text-xs leading-relaxed text-muted">
                 {contextual_meaning}
               </p>
             )}
           </>
         )}
-      </button>
+      </div>
 
-      {/* Rating buttons — only shown when flipped */}
       {flipped && (
-        <div className="w-full grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-4">
           <button
             onClick={() => {
               setFlipped(false);
               onRate("again");
             }}
-            className="py-3 rounded-xl border border-border text-foreground font-medium text-sm active:scale-[0.97] transition"
+            className="subtle-button rounded-xl py-3 text-sm font-medium text-foreground transition active:scale-[0.97]"
           >
             Again today
           </button>
@@ -105,7 +116,7 @@ export default function Flashcard({
               setFlipped(false);
               onRate("hard");
             }}
-            className="py-3 rounded-xl bg-danger/15 text-danger font-medium text-sm active:scale-[0.97] transition"
+            className="glass-chip rounded-xl py-3 text-sm font-medium text-danger transition active:scale-[0.97]"
           >
             Hard
           </button>
@@ -114,7 +125,7 @@ export default function Flashcard({
               setFlipped(false);
               onRate("medium");
             }}
-            className="py-3 rounded-xl bg-warning/15 text-warning font-medium text-sm active:scale-[0.97] transition"
+            className="glass-chip rounded-xl py-3 text-sm font-medium text-warning transition active:scale-[0.97]"
           >
             Medium
           </button>
@@ -123,7 +134,7 @@ export default function Flashcard({
               setFlipped(false);
               onRate("easy");
             }}
-            className="py-3 rounded-xl bg-success/15 text-success font-medium text-sm active:scale-[0.97] transition"
+            className="glass-chip rounded-xl py-3 text-sm font-medium text-success transition active:scale-[0.97]"
           >
             Easy
           </button>

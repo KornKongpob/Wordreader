@@ -59,25 +59,26 @@ export default function AuthForm() {
   };
 
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center px-6">
-      <div className="w-full max-w-sm">
-        {/* Logo & branding */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mb-4">
+    <div className="editorial-shell min-h-dvh flex flex-col items-center justify-center px-6 py-10">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-72 bg-[radial-gradient(circle_at_top,rgba(36,88,220,0.2),transparent_42%)]" />
+      <div className="pointer-events-none absolute left-1/2 top-24 z-0 h-56 w-56 -translate-x-1/2 rounded-full bg-primary/14 blur-3xl" />
+      <div className="glass-panel-strong relative z-10 w-full max-w-sm rounded-[2rem] px-6 py-8">
+        <div className="mb-8 flex flex-col items-center">
+          <div className="glow-button mb-4 flex h-16 w-16 items-center justify-center rounded-[1.4rem] text-primary-foreground">
             <BookOpen size={32} className="text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-bold">WordReader</h1>
-          <p className="text-muted text-sm mt-1">
-            Learn English from real news
+          <p className="editorial-label mb-2">Editorial English Reader</p>
+          <h1 className="text-3xl font-bold tracking-tight">WordReader</h1>
+          <p className="mt-2 max-w-xs text-center text-sm text-muted">
+            Learn English through clean, focused news reading with a softer glass interface.
           </p>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label
               htmlFor="email"
-              className="block text-sm font-medium mb-1.5"
+              className="mb-1.5 block text-sm font-medium"
             >
               Email
             </label>
@@ -88,7 +89,7 @@ export default function AuthForm() {
               onChange={(e) => setEmail(e.target.value)}
               required
               placeholder="you@example.com"
-              className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/50 transition"
+              className="glass-input w-full rounded-xl px-4 py-3 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/40 transition"
             />
           </div>
 
@@ -107,18 +108,18 @@ export default function AuthForm() {
               required
               minLength={6}
               placeholder="At least 6 characters"
-              className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/50 transition"
+              className="glass-input w-full rounded-xl px-4 py-3 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/40 transition"
             />
           </div>
 
           {error && (
-            <p className="text-danger text-sm bg-danger/10 rounded-lg px-3 py-2">
+            <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
               {error}
             </p>
           )}
 
           {message && (
-            <p className="text-success text-sm bg-success/10 rounded-lg px-3 py-2">
+            <p className="rounded-lg bg-success/10 px-3 py-2 text-sm text-success">
               {message}
             </p>
           )}
@@ -126,15 +127,14 @@ export default function AuthForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-medium flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50"
+            className="glow-button flex w-full items-center justify-center gap-2 rounded-xl py-3 font-medium text-primary-foreground transition hover:opacity-95 active:scale-[0.98] disabled:opacity-50"
           >
             {loading && <Loader2 size={18} className="animate-spin" />}
             {mode === "signin" ? "Sign In" : "Create Account"}
           </button>
         </form>
 
-        {/* Toggle mode */}
-        <p className="text-center text-sm text-muted mt-6">
+        <p className="mt-6 text-center text-sm text-muted">
           {mode === "signin" ? (
             <>
               Don&apos;t have an account?{" "}
@@ -145,7 +145,7 @@ export default function AuthForm() {
                   setError(null);
                   setMessage(null);
                 }}
-                className="text-primary font-medium"
+                className="font-medium text-primary"
               >
                 Sign Up
               </button>
@@ -160,7 +160,7 @@ export default function AuthForm() {
                   setError(null);
                   setMessage(null);
                 }}
-                className="text-primary font-medium"
+                className="font-medium text-primary"
               >
                 Sign In
               </button>

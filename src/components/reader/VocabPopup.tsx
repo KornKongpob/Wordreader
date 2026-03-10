@@ -2,13 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import {
-  X,
-  Loader2,
-  BookmarkPlus,
-  Check,
-  Languages,
-} from "lucide-react";
+import { X, Loader2, BookmarkPlus, Check, Languages } from "lucide-react";
 import SpeakButton from "@/components/common/SpeakButton";
 
 interface VocabPopupProps {
@@ -92,7 +86,6 @@ export default function VocabPopup({
         return;
       }
 
-      // Check if word already exists for this user
       const { data: existingItem } = await supabase
         .from("vocabulary_items")
         .select("id")
@@ -103,7 +96,6 @@ export default function VocabPopup({
       let vocabItemId: string;
 
       if (existingItem) {
-        // Word exists — update meanings if needed and add new context
         vocabItemId = existingItem.id;
 
         await supabase
@@ -118,7 +110,6 @@ export default function VocabPopup({
           })
           .eq("id", vocabItemId);
       } else {
-        // Create new vocabulary item
         const { data: newItem, error: insertError } = await supabase
           .from("vocabulary_items")
           .insert({
@@ -142,14 +133,12 @@ export default function VocabPopup({
 
         vocabItemId = newItem.id;
 
-        // Also create a review state for spaced repetition
         await supabase.from("review_states").insert({
           user_id: user.id,
           vocabulary_item_id: vocabItemId,
         });
       }
 
-      // Add the context (always, even if word existed — different sentence)
       await supabase.from("vocabulary_contexts").insert({
         vocabulary_item_id: vocabItemId,
         article_id: articleId,
@@ -168,26 +157,25 @@ export default function VocabPopup({
 
   return (
     <>
-      {/* Backdrop */}
       <div
-        className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm"
+        className="fixed inset-0 z-50 bg-slate-950/28 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      {/* Bottom sheet */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-background rounded-t-2xl border-t border-border shadow-lg max-h-[85dvh] overflow-y-auto pb-safe animate-slide-up">
-        <div className="px-5 pt-4 pb-6 max-w-lg mx-auto">
-          {/* Handle bar */}
-          <div className="flex justify-center mb-3">
-            <div className="w-10 h-1 rounded-full bg-border" />
+      <div className="glass-panel-strong fixed bottom-0 left-0 right-0 z-50 max-h-[85dvh] overflow-y-auto rounded-t-[2rem] pb-safe animate-slide-up">
+        <div className="mx-auto max-w-lg px-5 pb-6 pt-4">
+          <div className="mb-3 flex justify-center">
+            <div className="h-1 w-10 rounded-full bg-primary/20" />
           </div>
 
-          {/* Header */}
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex-1 min-w-0">
-              <h3 className="text-lg font-bold truncate">{word}</h3>
-              <p className="text-sm text-muted line-clamp-2 mt-0.5">
-                &ldquo;...{sentence.length > 120 ? sentence.slice(0, 120) + "..." : sentence}&rdquo;
+          <div className="mb-4 flex items-start justify-between">
+            <div className="min-w-0 flex-1">
+              <p className="editorial-label mb-2">Word Spotlight</p>
+              <h3 className="truncate text-lg font-bold">{word}</h3>
+              <p className="mt-0.5 line-clamp-2 text-sm text-muted">
+                &ldquo;...
+                {sentence.length > 120 ? sentence.slice(0, 120) + "..." : sentence}
+                &rdquo;
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <SpeakButton text={word} label="Word audio" />
@@ -196,24 +184,22 @@ export default function VocabPopup({
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 -mr-1 text-muted hover:text-foreground transition"
+              className="subtle-button -mr-1 rounded-xl p-1.5 text-muted transition hover:text-foreground"
             >
               <X size={20} />
             </button>
           </div>
 
-          {/* Actions before translation */}
           {!translation && !loading && (
             <button
               onClick={handleTranslate}
-              className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-medium flex items-center justify-center gap-2 active:scale-[0.98] transition"
+              className="glow-button flex w-full items-center justify-center gap-2 rounded-xl py-3 font-medium text-primary-foreground transition active:scale-[0.98]"
             >
               <Languages size={18} />
               Translate & Explain
             </button>
           )}
 
-          {/* Loading */}
           {loading && (
             <div className="flex items-center justify-center gap-2 py-6 text-muted">
               <Loader2 size={20} className="animate-spin" />
@@ -221,42 +207,36 @@ export default function VocabPopup({
             </div>
           )}
 
-          {/* Translation result */}
           {translation && (
             <div className="space-y-3">
-              {/* Thai meaning */}
-              <div className="p-3 rounded-xl bg-card border border-border">
-                <p className="text-xs text-muted mb-1">Thai</p>
-                <p className="text-lg font-medium">
-                  {translation.thai_meaning}
-                </p>
+              <div className="glass-panel rounded-xl p-3">
+                <p className="mb-1 text-xs text-muted">Thai</p>
+                <p className="text-lg font-medium">{translation.thai_meaning}</p>
               </div>
 
-              {/* English meaning */}
-              <div className="p-3 rounded-xl bg-card border border-border">
-                <p className="text-xs text-muted mb-1">
+              <div className="glass-panel rounded-xl p-3">
+                <p className="mb-1 text-xs text-muted">
                   English ({translation.part_of_speech})
                 </p>
                 <p className="text-sm">{translation.english_meaning}</p>
               </div>
 
-              {/* Contextual meaning */}
-              <div className="p-3 rounded-xl bg-card border border-border">
-                <p className="text-xs text-muted mb-1">In this context</p>
+              <div className="glass-panel rounded-xl p-3">
+                <p className="mb-1 text-xs text-muted">In this context</p>
                 <p className="text-sm">{translation.contextual_meaning}</p>
-                <p className="text-xs text-muted mt-2">
+                <p className="mt-2 text-xs text-muted">
                   {translation.context_explanation}
                 </p>
               </div>
 
-              <div className="rounded-xl border border-border bg-card px-3 py-2 text-xs text-muted">
-                Source: <span className="font-medium text-foreground">{articleSourceName}</span>
+              <div className="glass-chip rounded-xl px-3 py-2 text-xs text-muted">
+                Source:{" "}
+                <span className="font-medium text-foreground">{articleSourceName}</span>
               </div>
 
-              {/* Difficulty badge */}
               <div className="flex items-center gap-2">
                 <span
-                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                     translation.difficulty === "easy"
                       ? "bg-success/15 text-success"
                       : translation.difficulty === "medium"
@@ -268,12 +248,11 @@ export default function VocabPopup({
                 </span>
               </div>
 
-              {/* Save button */}
               {!saved ? (
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-medium flex items-center justify-center gap-2 active:scale-[0.98] transition disabled:opacity-50"
+                  className="glow-button flex w-full items-center justify-center gap-2 rounded-xl py-3 font-medium text-primary-foreground transition active:scale-[0.98] disabled:opacity-50"
                 >
                   {saving ? (
                     <Loader2 size={18} className="animate-spin" />
@@ -283,7 +262,7 @@ export default function VocabPopup({
                   {saving ? "Saving..." : "Save to Vocabulary"}
                 </button>
               ) : (
-                <div className="w-full py-3 rounded-xl bg-success/15 text-success font-medium flex items-center justify-center gap-2">
+                <div className="glass-chip flex w-full items-center justify-center gap-2 rounded-xl py-3 font-medium text-success">
                   <Check size={18} />
                   Saved!
                 </div>
@@ -291,9 +270,8 @@ export default function VocabPopup({
             </div>
           )}
 
-          {/* Error */}
           {error && (
-            <p className="text-danger text-sm bg-danger/10 rounded-lg px-3 py-2 mt-3">
+            <p className="mt-3 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
               {error}
             </p>
           )}

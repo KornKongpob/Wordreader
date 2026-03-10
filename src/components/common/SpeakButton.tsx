@@ -29,7 +29,7 @@ export default function SpeakButton({
     <button
       type="button"
       onClick={handleSpeak}
-      className={`inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted hover:text-foreground transition ${className}`}
+      className={`glass-chip inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-muted transition hover:text-foreground ${className}`}
     >
       <Volume2 size={14} />
       <span>{label}</span>

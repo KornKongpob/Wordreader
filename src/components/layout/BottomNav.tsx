@@ -78,8 +78,8 @@ export default function BottomNav() {
   }, [pathname]);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur-sm pb-safe">
-      <div className="flex items-center justify-around h-14 max-w-lg mx-auto">
+    <nav className="fixed bottom-3 left-3 right-3 z-50 pb-safe sm:left-1/2 sm:right-auto sm:w-full sm:max-w-lg sm:-translate-x-1/2">
+      <div className="glass-nav mx-auto flex h-16 items-center justify-around rounded-[1.75rem] px-2">
         {navItems.map(({ href, label, icon: Icon }) => {
           const isActive =
             href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -87,9 +87,9 @@ export default function BottomNav() {
             <Link
               key={href}
               href={href}
-              className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1 text-xs transition-colors ${
+              className={`flex min-w-14 flex-col items-center justify-center gap-0.5 rounded-2xl px-3 py-2 text-xs transition-colors ${
                 isActive
-                  ? "text-primary font-medium"
+                  ? "glass-chip text-primary font-medium"
                   : "text-muted hover:text-foreground"
               }`}
             >
