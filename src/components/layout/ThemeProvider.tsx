@@ -81,7 +81,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const supabase = createClient();
     if (!supabase) return;
 
-    void supabase.auth.getUser().then(({ data: { user } }) => {
+    void (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
       if (!user) return;
 
       void supabase.from("user_settings").upsert(
@@ -91,7 +95,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         },
         { onConflict: "user_id" }
       );
-    });
+    })();
   };
 
   return (

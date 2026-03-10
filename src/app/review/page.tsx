@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { calculateNextReview } from "@/lib/srs";
 import AppShell from "@/components/layout/AppShell";
@@ -21,6 +21,34 @@ interface ReviewCard {
   interval_days: number;
   repetitions: number;
   review_state_id: string;
+}
+
+interface ReviewStateRow {
+  id: string;
+  vocabulary_item_id: string;
+  ease_factor: number;
+  interval_days: number;
+  repetitions: number;
+  next_review_at: string;
+}
+
+interface ReviewDayRow {
+  reviewed_at: string;
+}
+
+interface ReviewVocabularyRow {
+  id: string;
+  word: string;
+  thai_meaning: string;
+  english_meaning: string;
+  part_of_speech: string;
+}
+
+interface ReviewContextRow {
+  vocabulary_item_id: string;
+  original_sentence: string;
+  contextual_meaning: string;
+  created_at: string;
 }
 
 function getStartOfToday() {
@@ -61,6 +89,7 @@ function calculateStreak(reviewedAt: string[]) {
 }
 
 export default function ReviewPage() {
+  const supabase = createClient();
   const [cards, setCards] = useState<ReviewCard[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -70,10 +99,10 @@ export default function ReviewPage() {
   const [streak, setStreak] = useState(0);
   const [offlineSession, setOfflineSession] = useState(false);
   const [sessionReviewed, setSessionReviewed] = useState(0);
+  const userIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const fetchReviewData = async () => {
-      const supabase = createClient();
       if (!supabase) {
         const cachedDeck = getOfflineReviewDeck().cards;
         setCards(cachedDeck as ReviewCard[]);
@@ -90,6 +119,7 @@ export default function ReviewPage() {
         setLoading(false);
         return;
       }
+      userIdRef.current = user.id;
 
       const startOfToday = getStartOfToday().toISOString();
 
@@ -122,7 +152,11 @@ export default function ReviewPage() {
 
       setReviewGoal(settings?.review_goal ?? 10);
       setReviewedToday(reviewedCount ?? 0);
-      setStreak(calculateStreak((reviewDays ?? []).map((entry) => entry.reviewed_at)));
+      setStreak(
+        calculateStreak(
+          (reviewDays ?? []).map((entry: ReviewDayRow) => entry.reviewed_at)
+        )
+      );
 
       if (!reviewStates || reviewStates.length === 0) {
         setCards([]);
@@ -130,39 +164,57 @@ export default function ReviewPage() {
         return;
       }
 
-      const reviewCards: ReviewCard[] = [];
+      const typedReviewStates = reviewStates as ReviewStateRow[];
+      const vocabularyIds = typedReviewStates.map((item) => item.vocabulary_item_id);
 
-      for (const reviewState of reviewStates) {
-        const { data: vocabItem } = await supabase
+      const [{ data: vocabItems }, { data: contexts }] = await Promise.all([
+        supabase
           .from("vocabulary_items")
-          .select("word, thai_meaning, english_meaning, part_of_speech")
-          .eq("id", reviewState.vocabulary_item_id)
-          .single();
-
-        if (!vocabItem) continue;
-
-        const { data: context } = await supabase
+          .select("id, word, thai_meaning, english_meaning, part_of_speech")
+          .in("id", vocabularyIds),
+        supabase
           .from("vocabulary_contexts")
-          .select("original_sentence, contextual_meaning")
-          .eq("vocabulary_item_id", reviewState.vocabulary_item_id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .select("vocabulary_item_id, original_sentence, contextual_meaning, created_at")
+          .in("vocabulary_item_id", vocabularyIds)
+          .order("created_at", { ascending: false }),
+      ]);
 
-        reviewCards.push({
-          vocabulary_item_id: reviewState.vocabulary_item_id,
-          word: vocabItem.word,
-          thai_meaning: vocabItem.thai_meaning,
-          english_meaning: vocabItem.english_meaning,
-          part_of_speech: vocabItem.part_of_speech,
-          example_sentence: context?.original_sentence || "",
-          contextual_meaning: context?.contextual_meaning || "",
-          ease_factor: reviewState.ease_factor,
-          interval_days: reviewState.interval_days,
-          repetitions: reviewState.repetitions,
-          review_state_id: reviewState.id,
-        });
+      const vocabMap = new Map(
+        ((vocabItems ?? []) as ReviewVocabularyRow[]).map((item) => [item.id, item])
+      );
+      const contextMap = new Map<string, { original_sentence: string; contextual_meaning: string }>();
+
+      for (const context of (contexts ?? []) as ReviewContextRow[]) {
+        if (!contextMap.has(context.vocabulary_item_id)) {
+          contextMap.set(context.vocabulary_item_id, {
+            original_sentence: context.original_sentence || "",
+            contextual_meaning: context.contextual_meaning || "",
+          });
+        }
       }
+
+      const reviewCards: ReviewCard[] = typedReviewStates.flatMap((reviewState) => {
+        const vocabItem = vocabMap.get(reviewState.vocabulary_item_id);
+        if (!vocabItem) return [];
+
+        const context = contextMap.get(reviewState.vocabulary_item_id);
+
+        return [
+          {
+            vocabulary_item_id: reviewState.vocabulary_item_id,
+            word: vocabItem.word,
+            thai_meaning: vocabItem.thai_meaning,
+            english_meaning: vocabItem.english_meaning,
+            part_of_speech: vocabItem.part_of_speech,
+            example_sentence: context?.original_sentence || "",
+            contextual_meaning: context?.contextual_meaning || "",
+            ease_factor: reviewState.ease_factor,
+            interval_days: reviewState.interval_days,
+            repetitions: reviewState.repetitions,
+            review_state_id: reviewState.id,
+          },
+        ];
+      });
 
       setCards(reviewCards);
       saveOfflineReviewDeck(reviewCards);
@@ -170,46 +222,11 @@ export default function ReviewPage() {
     };
 
     void fetchReviewData();
-  }, []);
+  }, [supabase]);
 
   const handleRate = async (rating: "again" | "easy" | "medium" | "hard") => {
     const card = cards[currentIndex];
     if (!card) return;
-
-    const supabase = createClient();
-    if (supabase) {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (user) {
-        const update = calculateNextReview(
-          {
-            ease_factor: card.ease_factor,
-            interval_days: card.interval_days,
-            repetitions: card.repetitions,
-          },
-          rating
-        );
-
-        await supabase
-          .from("review_states")
-          .update({
-            ease_factor: update.ease_factor,
-            interval_days: update.interval_days,
-            repetitions: update.repetitions,
-            next_review_at: update.next_review_at,
-            last_reviewed_at: new Date().toISOString(),
-          })
-          .eq("id", card.review_state_id);
-
-        await supabase.from("review_events").insert({
-          user_id: user.id,
-          vocabulary_item_id: card.vocabulary_item_id,
-          rating,
-        });
-      }
-    }
 
     setReviewedToday((current) => current + 1);
     setSessionReviewed((current) => current + 1);
@@ -219,6 +236,36 @@ export default function ReviewPage() {
     } else {
       setFinished(true);
     }
+
+    const userId = userIdRef.current;
+    if (!supabase || !userId) return;
+
+    const update = calculateNextReview(
+      {
+        ease_factor: card.ease_factor,
+        interval_days: card.interval_days,
+        repetitions: card.repetitions,
+      },
+      rating
+    );
+
+    void Promise.all([
+      supabase
+        .from("review_states")
+        .update({
+          ease_factor: update.ease_factor,
+          interval_days: update.interval_days,
+          repetitions: update.repetitions,
+          next_review_at: update.next_review_at,
+          last_reviewed_at: new Date().toISOString(),
+        })
+        .eq("id", card.review_state_id),
+      supabase.from("review_events").insert({
+        user_id: userId,
+        vocabulary_item_id: card.vocabulary_item_id,
+        rating,
+      }),
+    ]);
   };
 
   const goalProgress = useMemo(

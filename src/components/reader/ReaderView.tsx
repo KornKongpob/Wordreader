@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useDeferredValue, useEffect, useRef, useState } from "react";
 import { ExternalLink, BookMarked, RotateCcw } from "lucide-react";
 import ReaderControls from "./ReaderControls";
 import VocabPopup from "./VocabPopup";
@@ -14,6 +14,10 @@ import type { Article } from "@/types";
 
 interface ReaderViewProps {
   article: Article;
+}
+
+interface SavedWordRow {
+  word: string;
 }
 
 function getStoredFontSize() {
@@ -106,6 +110,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
   const [lineSpacing, setLineSpacing] = useState(getStoredLineSpacing);
   const [lookupMode, setLookupMode] = useState<"word" | "phrase">(getStoredLookupMode);
   const [savedWords, setSavedWords] = useState<string[]>([]);
+  const [renderedContent, setRenderedContent] = useState(article.content);
   const [resumePosition, setResumePosition] = useState<number | null>(null);
   const [popupData, setPopupData] = useState<{
     word: string;
@@ -115,6 +120,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
   const userIdRef = useRef<string | null>(null);
   const latestSelectionRef = useRef<string | null>(null);
   const progressRef = useRef(0);
+  const deferredSavedWords = useDeferredValue(savedWords);
 
   const { selection, clearSelection } = useTextSelection(contentRef, {
     maxLength: lookupMode === "phrase" ? 240 : 48,
@@ -174,7 +180,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
       }
 
       if (vocabWords) {
-        setSavedWords(vocabWords.map((entry) => entry.word));
+        setSavedWords((vocabWords as SavedWordRow[]).map((entry) => entry.word));
       } else {
         const offlineVocabulary = getOfflineVocabulary();
         if (offlineVocabulary.items.length > 0) {
@@ -279,6 +285,21 @@ export default function ReaderView({ article }: ReaderViewProps) {
     );
   };
 
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      const nextContent =
+        deferredSavedWords.length === 0
+          ? article.content
+          : highlightArticleContent(article.content, deferredSavedWords);
+
+      startTransition(() => {
+        setRenderedContent(nextContent);
+      });
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
+  }, [article.content, deferredSavedWords]);
+
   const formattedDate = article.published_at
     ? new Date(article.published_at).toLocaleDateString("en-US", {
         year: "numeric",
@@ -286,11 +307,6 @@ export default function ReaderView({ article }: ReaderViewProps) {
         day: "numeric",
       })
     : null;
-
-  const renderedContent = useMemo(
-    () => highlightArticleContent(article.content, savedWords),
-    [article.content, savedWords]
-  );
 
   const handleOpenPopup = () => {
     if (selection) {

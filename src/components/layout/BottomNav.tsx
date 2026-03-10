@@ -14,12 +14,36 @@ const navItems = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
+const DUE_COUNT_CACHE_KEY = "wordreader.review.due-count";
+const DUE_COUNT_CACHE_TTL_MS = 60 * 1000;
+
 export default function BottomNav() {
   const pathname = usePathname();
   const [dueCount, setDueCount] = useState(0);
 
   useEffect(() => {
     const loadDueCount = async () => {
+      const cached =
+        typeof window !== "undefined"
+          ? sessionStorage.getItem(DUE_COUNT_CACHE_KEY)
+          : null;
+
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached) as {
+            count: number;
+            checkedAt: number;
+            userId: string;
+          };
+
+          if (Date.now() - parsed.checkedAt < DUE_COUNT_CACHE_TTL_MS) {
+            setDueCount(parsed.count);
+          }
+        } catch {
+          sessionStorage.removeItem(DUE_COUNT_CACHE_KEY);
+        }
+      }
+
       const supabase = createClient();
       if (!supabase) return;
 
@@ -35,7 +59,19 @@ export default function BottomNav() {
         .eq("user_id", user.id)
         .lte("next_review_at", new Date().toISOString());
 
-      setDueCount(count ?? 0);
+      const nextCount = count ?? 0;
+      setDueCount(nextCount);
+
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(
+          DUE_COUNT_CACHE_KEY,
+          JSON.stringify({
+            count: nextCount,
+            checkedAt: Date.now(),
+            userId: user.id,
+          })
+        );
+      }
     };
 
     void loadDueCount();

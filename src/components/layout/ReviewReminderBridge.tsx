@@ -7,6 +7,8 @@ export default function ReviewReminderBridge() {
   useEffect(() => {
     const maybeNotify = async () => {
       if (typeof window === "undefined" || !("Notification" in window)) return;
+      const todayKey = `wordreader-reminder-${new Date().toISOString().slice(0, 10)}`;
+      if (localStorage.getItem(todayKey)) return;
 
       const supabase = createClient();
       if (!supabase) return;
@@ -43,9 +45,6 @@ export default function ReviewReminderBridge() {
 
       const dueCount = count ?? 0;
       if (dueCount <= 0) return;
-
-      const todayKey = `wordreader-reminder-${new Date().toISOString().slice(0, 10)}`;
-      if (localStorage.getItem(todayKey)) return;
 
       new Notification("WordReader reminder", {
         body:

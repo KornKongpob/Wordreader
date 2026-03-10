@@ -98,7 +98,11 @@ export default function SettingsPage() {
       if (vCount !== null) setVocabCount(vCount);
       if (due !== null) setDueCount(due);
       if (readingHistory) {
-        setArticleCount(new Set(readingHistory.map((row) => row.article_id)).size);
+        setArticleCount(
+          new Set(
+            readingHistory.map((row: { article_id: string }) => row.article_id)
+          ).size
+        );
       }
 
       if (settings?.font_size) {

@@ -22,6 +22,10 @@ interface VocabItem {
   due_now?: boolean;
 }
 
+interface DueStateRow {
+  vocabulary_item_id: string;
+}
+
 type SortOption = "newest" | "oldest" | "alpha";
 type DifficultyFilter = "all" | "easy" | "medium" | "hard";
 
@@ -71,11 +75,13 @@ export default function VocabList() {
       ]);
 
       if (!error && vocabItems) {
-        const dueIds = new Set((dueStates ?? []).map((state) => state.vocabulary_item_id));
-        const normalizedItems = vocabItems.map((item) => ({
+        const dueIds = new Set(
+          ((dueStates ?? []) as DueStateRow[]).map((state) => state.vocabulary_item_id)
+        );
+        const normalizedItems = (vocabItems as VocabItem[]).map((item) => ({
           ...item,
           due_now: dueIds.has(item.id),
-        })) as VocabItem[];
+        }));
 
         setItems(normalizedItems);
         saveOfflineVocabulary(normalizedItems);

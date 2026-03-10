@@ -59,6 +59,15 @@ interface ReviewEventItem {
   reviewed_at: string;
 }
 
+interface ContextRow {
+  id: string;
+  original_sentence: string;
+  contextual_meaning: string;
+  context_explanation: string;
+  created_at: string;
+  article_id: string;
+}
+
 export default function VocabularyDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -114,7 +123,7 @@ export default function VocabularyDetailPage() {
 
       if (contextData) {
         const contextWithArticles = await Promise.all(
-          contextData.map(async (contextRow) => {
+          (contextData as ContextRow[]).map(async (contextRow) => {
             const { data: articleData } = await supabase
               .from("articles")
               .select("id, title, url, source_name")
