@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { getUserWithProfile } from "@/lib/supabase/ensureProfile";
 import { useRouter } from "next/navigation";
 import { BookOpen, Loader2 } from "lucide-react";
 
@@ -50,6 +51,7 @@ export default function AuthForm() {
       if (error) {
         setError(error.message);
       } else {
+        await getUserWithProfile(supabase);
         router.push("/");
         router.refresh();
       }

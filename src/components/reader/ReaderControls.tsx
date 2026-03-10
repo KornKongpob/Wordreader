@@ -39,46 +39,48 @@ export default function ReaderControls({
 
   return (
     <>
-      <div className="sticky top-0 z-40 px-3 pt-safe">
-        <div className="glass-nav mx-auto mt-3 flex h-14 max-w-2xl items-center justify-between rounded-[1.6rem] px-4">
-          <Link
-            href="/read"
-            className="glass-chip flex items-center gap-1 rounded-full px-3 py-1.5 text-muted transition hover:text-foreground"
-          >
-            <ArrowLeft size={20} />
-            <span className="text-sm">Back</span>
-          </Link>
-
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setShowPanel(!showPanel)}
-              className={`rounded-xl p-2 transition ${
-                showPanel
-                  ? "glass-chip text-primary"
-                  : "subtle-button text-muted hover:text-foreground"
-              }`}
-              aria-label="Reading settings"
+      <div className="sticky top-0 z-40 border-b soft-divider bg-[color-mix(in_srgb,var(--color-background)_82%,transparent)] pt-safe backdrop-blur-xl">
+        <div className="px-3 pb-3 pt-3">
+          <div className="glass-nav mx-auto flex h-14 max-w-2xl items-center justify-between rounded-[1.6rem] px-4">
+            <Link
+              href="/read"
+              className="glass-chip flex items-center gap-1 rounded-full px-3 py-1.5 text-muted transition hover:text-foreground"
             >
-              <Type size={20} />
-            </button>
+              <ArrowLeft size={20} />
+              <span className="text-sm">Back</span>
+            </Link>
 
-            <button
-              onClick={toggleTheme}
-              className="subtle-button rounded-xl p-2 text-muted transition hover:text-foreground"
-              aria-label="Toggle dark mode"
-            >
-              {resolvedTheme === "dark" ? (
-                <Sun size={20} />
-              ) : (
-                <Moon size={20} />
-              )}
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setShowPanel(!showPanel)}
+                className={`rounded-xl p-2 transition ${
+                  showPanel
+                    ? "glass-chip text-primary"
+                    : "subtle-button text-muted hover:text-foreground"
+                }`}
+                aria-label="Reading settings"
+              >
+                <Type size={20} />
+              </button>
+
+              <button
+                onClick={toggleTheme}
+                className="subtle-button rounded-xl p-2 text-muted transition hover:text-foreground"
+                aria-label="Toggle dark mode"
+              >
+                {resolvedTheme === "dark" ? (
+                  <Sun size={20} />
+                ) : (
+                  <Moon size={20} />
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       {showPanel && (
-        <div className="sticky top-[4.75rem] z-30 px-3">
+        <div className="sticky top-[5.25rem] z-30 border-b soft-divider bg-[color-mix(in_srgb,var(--color-background)_82%,transparent)] px-3 pb-3 backdrop-blur-xl">
           <div className="glass-panel mx-auto max-w-2xl rounded-[1.5rem] px-4 py-4 space-y-4">
             <div className="flex items-center justify-between">
               <div>

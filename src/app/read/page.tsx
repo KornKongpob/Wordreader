@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getOfflineArticles, type OfflineArticleRecord } from "@/lib/offline";
+import { getUserWithProfile } from "@/lib/supabase/ensureProfile";
 
 interface RecentArticle {
   article_id: string;
@@ -146,12 +147,10 @@ export default function ReadPage() {
       return;
     }
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { user, error: userError } = await getUserWithProfile(supabase);
 
-    if (!user) {
-      setError("Please sign in again to continue.");
+    if (!user || userError) {
+      setError(userError || "Please sign in again to continue.");
       return;
     }
 
@@ -442,15 +441,15 @@ export default function ReadPage() {
         <section>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-medium uppercase tracking-wide text-muted">
-              Offline library
+              Saved reading history
             </h2>
-            <span className="text-xs text-muted">{offlineArticles.length} cached</span>
+            <span className="text-xs text-muted">{offlineArticles.length} saved</span>
           </div>
           {offlineArticles.length === 0 ? (
             <div className="glass-panel rounded-2xl p-5 text-center">
-              <p className="font-medium">No offline copies yet</p>
+              <p className="font-medium">No saved reading copies yet</p>
               <p className="mt-1 text-sm text-muted">
-                Turn on offline mode in settings, then open articles to cache them.
+                Articles you open get stored here so you can reopen them later, even when the original page is unavailable.
               </p>
             </div>
           ) : (
@@ -466,6 +465,9 @@ export default function ReadPage() {
                     {article.source_name}
                   </p>
                   <p className="mt-1 font-semibold leading-snug">{article.title}</p>
+                  <p className="mt-2 text-xs text-muted">
+                    Opens with the full reader when you&apos;re online, and falls back to the saved copy if needed.
+                  </p>
                   <p className="mt-2 text-xs text-muted">
                     Cached {formatRelativeTime(article.cached_at).replace("Updated ", "")}
                   </p>

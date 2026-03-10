@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { startTransition, useDeferredValue, useEffect, useRef, useState } from "react";
 import { ExternalLink, BookMarked, RotateCcw } from "lucide-react";
+import ProfileBootstrap from "@/components/layout/ProfileBootstrap";
 import ReaderControls from "./ReaderControls";
 import VocabPopup from "./VocabPopup";
 import ArticleNotes from "./ArticleNotes";
@@ -10,6 +11,7 @@ import ArticleQuiz from "./ArticleQuiz";
 import { useTextSelection } from "@/hooks/useTextSelection";
 import { createClient } from "@/lib/supabase/client";
 import { getOfflineVocabulary, saveOfflineArticle } from "@/lib/offline";
+import { getUserWithProfile } from "@/lib/supabase/ensureProfile";
 import type { Article } from "@/types";
 
 interface ReaderViewProps {
@@ -112,6 +114,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
   const [savedWords, setSavedWords] = useState<string[]>([]);
   const [renderedContent, setRenderedContent] = useState(article.content);
   const [resumePosition, setResumePosition] = useState<number | null>(null);
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const [popupData, setPopupData] = useState<{
     word: string;
     sentence: string;
@@ -134,17 +137,38 @@ export default function ReaderView({ article }: ReaderViewProps) {
     const loadReaderContext = async () => {
       if (!supabase) return;
 
+      let shouldCacheOffline = true;
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        user,
+        error: userError,
+      } = await getUserWithProfile(supabase);
 
       if (!user) {
         const offlineVocabulary = getOfflineVocabulary();
         if (offlineVocabulary.items.length > 0) {
           setSavedWords(offlineVocabulary.items.map((entry) => entry.word));
         }
+        if (userError && userError !== "Please sign in again.") {
+          setSyncNotice(
+            "Cloud sync is unavailable right now. Reading still works, but notes and vocabulary saves may fail."
+          );
+        }
+        if (shouldCacheOffline) {
+          saveOfflineArticle({
+            id: article.id,
+            title: article.title,
+            url: article.url,
+            source_name: article.source_name,
+            author: article.author,
+            published_at: article.published_at,
+            image_url: article.image_url,
+            content: article.content,
+          });
+        }
         return;
       }
+
+      setSyncNotice(null);
       userIdRef.current = user.id;
 
       const [{ data: settings }, { data: vocabWords }, { data: history }] =
@@ -179,6 +203,10 @@ export default function ReaderView({ article }: ReaderViewProps) {
         localStorage.setItem("readerLookupMode", settings.reader_mode);
       }
 
+      if (settings?.enable_offline === false) {
+        shouldCacheOffline = false;
+      }
+
       if (vocabWords) {
         setSavedWords((vocabWords as SavedWordRow[]).map((entry) => entry.word));
       } else {
@@ -192,7 +220,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
         setResumePosition(history.last_position);
       }
 
-      if (settings?.enable_offline !== false) {
+      if (shouldCacheOffline) {
         saveOfflineArticle({
           id: article.id,
           title: article.title,
@@ -338,8 +366,18 @@ export default function ReaderView({ article }: ReaderViewProps) {
     window.scrollTo({ top: resumePosition, behavior: "smooth" });
   };
 
+  const handleWordSaved = (savedWord: string) => {
+    setSavedWords((current) => {
+      const exists = current.some(
+        (word) => word.toLowerCase() === savedWord.toLowerCase()
+      );
+      return exists ? current : [...current, savedWord];
+    });
+  };
+
   return (
     <div className="min-h-dvh flex flex-col">
+      <ProfileBootstrap />
       <ReaderControls
         fontSize={fontSize}
         lineSpacing={lineSpacing}
@@ -369,6 +407,12 @@ export default function ReaderView({ article }: ReaderViewProps) {
               </button>
             )}
           </div>
+
+          {syncNotice && (
+            <div className="mb-4 rounded-[1.2rem] bg-warning/10 px-3 py-2 text-sm text-warning">
+              {syncNotice}
+            </div>
+          )}
 
           <p className="editorial-label mb-2">Reader View</p>
           <h1
@@ -454,6 +498,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
           articleId={article.id}
           articleTitle={article.title}
           articleSourceName={article.source_name}
+          onSaved={handleWordSaved}
           onClose={() => setPopupData(null)}
         />
       )}

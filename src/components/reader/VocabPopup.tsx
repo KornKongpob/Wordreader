@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { X, Loader2, BookmarkPlus, Check, Languages } from "lucide-react";
 import SpeakButton from "@/components/common/SpeakButton";
+import { getUserWithProfile } from "@/lib/supabase/ensureProfile";
 
 interface VocabPopupProps {
   word: string;
@@ -11,6 +12,7 @@ interface VocabPopupProps {
   articleId: string;
   articleTitle: string;
   articleSourceName: string;
+  onSaved?: (word: string) => void;
   onClose: () => void;
 }
 
@@ -29,6 +31,7 @@ export default function VocabPopup({
   articleId,
   articleTitle,
   articleSourceName,
+  onSaved,
   onClose,
 }: VocabPopupProps) {
   const [translation, setTranslation] = useState<TranslationData | null>(null);
@@ -70,35 +73,40 @@ export default function VocabPopup({
     setError(null);
 
     try {
+      const normalizedWord = word.trim();
       const supabase = createClient();
       if (!supabase) {
         setError("Supabase is not configured.");
         setSaving(false);
         return;
       }
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { user, error: userError } = await getUserWithProfile(supabase);
 
-      if (!user) {
-        setError("Please sign in to save vocabulary.");
+      if (!user || userError) {
+        setError(userError || "Please sign in to save vocabulary.");
         setSaving(false);
         return;
       }
 
-      const { data: existingItem } = await supabase
+      const { data: existingItem, error: existingItemError } = await supabase
         .from("vocabulary_items")
         .select("id")
         .eq("user_id", user.id)
-        .ilike("word", word.trim())
+        .ilike("word", normalizedWord)
         .maybeSingle();
+
+      if (existingItemError) {
+        setError(existingItemError.message);
+        setSaving(false);
+        return;
+      }
 
       let vocabItemId: string;
 
       if (existingItem) {
         vocabItemId = existingItem.id;
 
-        await supabase
+        const { error: updateError } = await supabase
           .from("vocabulary_items")
           .update({
             thai_meaning: translation.thai_meaning,
@@ -109,17 +117,23 @@ export default function VocabPopup({
             updated_at: new Date().toISOString(),
           })
           .eq("id", vocabItemId);
+
+        if (updateError) {
+          setError(updateError.message);
+          setSaving(false);
+          return;
+        }
       } else {
         const { data: newItem, error: insertError } = await supabase
           .from("vocabulary_items")
           .insert({
             user_id: user.id,
-            word: word.trim(),
+            word: normalizedWord,
             thai_meaning: translation.thai_meaning,
             english_meaning: translation.english_meaning,
             part_of_speech: translation.part_of_speech,
             difficulty: translation.difficulty,
-            pronunciation: word.trim(),
+            pronunciation: normalizedWord,
             last_source_name: articleSourceName,
           })
           .select("id")
@@ -133,13 +147,22 @@ export default function VocabPopup({
 
         vocabItemId = newItem.id;
 
-        await supabase.from("review_states").insert({
-          user_id: user.id,
-          vocabulary_item_id: vocabItemId,
-        });
+        const { error: reviewStateError } = await supabase.from("review_states").upsert(
+          {
+            user_id: user.id,
+            vocabulary_item_id: vocabItemId,
+          },
+          { onConflict: "user_id,vocabulary_item_id" }
+        );
+
+        if (reviewStateError) {
+          setError(reviewStateError.message);
+          setSaving(false);
+          return;
+        }
       }
 
-      await supabase.from("vocabulary_contexts").insert({
+      const { error: contextError } = await supabase.from("vocabulary_contexts").insert({
         vocabulary_item_id: vocabItemId,
         article_id: articleId,
         original_sentence: sentence,
@@ -147,7 +170,14 @@ export default function VocabPopup({
         context_explanation: translation.context_explanation,
       });
 
+      if (contextError) {
+        setError(contextError.message);
+        setSaving(false);
+        return;
+      }
+
       setSaved(true);
+      onSaved?.(normalizedWord);
     } catch {
       setError("Could not save. Please try again.");
     }

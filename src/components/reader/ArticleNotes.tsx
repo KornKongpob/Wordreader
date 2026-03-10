@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2, StickyNote, Save } from "lucide-react";
+import { getUserWithProfile } from "@/lib/supabase/ensureProfile";
 
 interface ArticleNotesProps {
   articleId: string;
@@ -13,6 +14,7 @@ export default function ArticleNotes({ articleId }: ArticleNotesProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const loadNote = async () => {
@@ -22,9 +24,7 @@ export default function ArticleNotes({ articleId }: ArticleNotesProps) {
         return;
       }
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { user } = await getUserWithProfile(supabase);
 
       if (!user) {
         setLoading(false);
@@ -48,6 +48,7 @@ export default function ArticleNotes({ articleId }: ArticleNotesProps) {
   const handleSave = async () => {
     setSaving(true);
     setMessage("");
+    setError("");
 
     const supabase = createClient();
     if (!supabase) {
@@ -55,16 +56,15 @@ export default function ArticleNotes({ articleId }: ArticleNotesProps) {
       return;
     }
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { user, error: userError } = await getUserWithProfile(supabase);
 
-    if (!user) {
+    if (!user || userError) {
+      setError(userError || "Please sign in to save notes.");
       setSaving(false);
       return;
     }
 
-    await supabase.from("article_notes").upsert(
+    const { error: saveError } = await supabase.from("article_notes").upsert(
       {
         user_id: user.id,
         article_id: articleId,
@@ -73,6 +73,12 @@ export default function ArticleNotes({ articleId }: ArticleNotesProps) {
       },
       { onConflict: "user_id,article_id" }
     );
+
+    if (saveError) {
+      setError(saveError.message);
+      setSaving(false);
+      return;
+    }
 
     setMessage("Saved");
     setSaving(false);
@@ -91,6 +97,11 @@ export default function ArticleNotes({ articleId }: ArticleNotesProps) {
         </div>
       ) : (
         <>
+          {error && (
+            <p className="mb-3 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">
+              {error}
+            </p>
+          )}
           <textarea
             value={note}
             onChange={(event) => setNote(event.target.value)}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Brain, CheckCircle2, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { getUserWithProfile } from "@/lib/supabase/ensureProfile";
 import type { QuizQuestion } from "@/types";
 
 interface ArticleQuizProps {
@@ -26,9 +27,7 @@ export default function ArticleQuiz({
       const supabase = createClient();
       if (!supabase) return;
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { user } = await getUserWithProfile(supabase);
 
       if (!user) return;
 
@@ -71,12 +70,10 @@ export default function ArticleQuiz({
 
       const supabase = createClient();
       if (supabase) {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const { user, error: userError } = await getUserWithProfile(supabase);
 
         if (user) {
-          await supabase.from("article_quizzes").upsert(
+          const { error: saveError } = await supabase.from("article_quizzes").upsert(
             {
               user_id: user.id,
               article_id: articleId,
@@ -85,6 +82,12 @@ export default function ArticleQuiz({
             },
             { onConflict: "user_id,article_id" }
           );
+
+          if (saveError) {
+            setError(saveError.message);
+          }
+        } else if (userError && userError !== "Please sign in again.") {
+          setError(userError);
         }
       }
     } catch {
