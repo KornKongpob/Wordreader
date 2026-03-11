@@ -193,6 +193,8 @@ html.standalone {
 .article-content {
   font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
   color: color-mix(in srgb, var(--color-foreground) 92%, transparent);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .article-content p {
@@ -260,6 +262,39 @@ html.standalone {
 .article-content ::selection {
   background: rgba(37, 99, 235, 0.3);
   color: inherit;
+}
+
+.text-wrap-anywhere {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.text-safe-title {
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.text-safe-body {
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.text-safe-meta {
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.chip-truncate {
+  display: inline-block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: nowrap;
 }
 
 .reader-chrome {

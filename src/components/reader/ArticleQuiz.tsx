@@ -104,19 +104,21 @@ export default function ArticleQuiz({
 
   return (
     <section className="glass-panel mt-8 rounded-2xl p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+      <div className="mb-3 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-2">
           <Brain size={16} className="text-primary" />
-          <div>
-            <h2 className="font-medium">Quick comprehension quiz</h2>
-            <p className="text-xs text-muted">Check if the article really stuck.</p>
+          <div className="min-w-0">
+            <h2 className="text-safe-title font-medium">Quick comprehension quiz</h2>
+            <p className="text-safe-meta text-xs text-muted">
+              Check if the article really stuck.
+            </p>
           </div>
         </div>
         <button
           type="button"
           onClick={handleGenerate}
           disabled={loading}
-          className="subtle-button rounded-xl px-3 py-2 text-sm font-medium disabled:opacity-60"
+          className="subtle-button min-h-[2.75rem] w-full rounded-xl px-3 py-2 text-center text-sm font-medium disabled:opacity-60 sm:w-auto"
         >
           {loading ? "Generating..." : questions.length ? "Refresh quiz" : "Generate quiz"}
         </button>
@@ -135,7 +137,7 @@ export default function ArticleQuiz({
 
       {questions.length > 0 && (
         <div className="space-y-4">
-          <div className="glass-chip rounded-xl px-3 py-2 text-sm text-muted">
+          <div className="glass-chip text-safe-body rounded-xl px-3 py-2 text-sm text-muted">
             Score: {score}/{questions.length}
             {answered < questions.length && ` | ${questions.length - answered} left`}
           </div>
@@ -145,7 +147,7 @@ export default function ArticleQuiz({
 
             return (
               <div key={`${question.question}-${index}`} className="glass-panel rounded-2xl p-4">
-                <p className="mb-3 font-medium">
+                <p className="text-safe-title mb-3 font-medium">
                   {index + 1}. {question.question}
                 </p>
                 <div className="space-y-2">
@@ -161,7 +163,7 @@ export default function ArticleQuiz({
                         onClick={() =>
                           setSelected((current) => ({ ...current, [index]: optionIndex }))
                         }
-                        className={`w-full rounded-xl border px-3 py-2 text-left text-sm transition ${
+                        className={`text-safe-body w-full rounded-xl border px-3 py-2 text-left text-sm transition ${
                           isAnswered
                             ? isCorrect
                               ? "border-success bg-success/10 text-foreground"
@@ -179,7 +181,7 @@ export default function ArticleQuiz({
                 {isAnswered && (
                   <div className="glass-chip mt-3 flex items-start gap-2 rounded-xl px-3 py-2 text-sm text-muted">
                     <CheckCircle2 size={16} className="mt-0.5 text-primary" />
-                    <span>{question.explanation}</span>
+                    <span className="text-safe-body">{question.explanation}</span>
                   </div>
                 )}
               </div>

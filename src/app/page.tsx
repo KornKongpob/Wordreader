@@ -179,10 +179,10 @@ export default async function HomePage() {
             <span>Daily reading dashboard</span>
           </div>
           <p className="editorial-label mb-2">Today&apos;s Reading Desk</p>
-          <h1 className="text-3xl font-bold leading-tight tracking-tight">
+          <h1 className="text-safe-title text-3xl font-bold tracking-tight">
             Hello, {firstName}
           </h1>
-          <p className="mt-2 text-sm text-muted">
+          <p className="text-safe-body mt-2 text-sm text-muted">
             You&apos;ve reviewed {reviewedCount}/{reviewGoal} cards today and have{" "}
             {dueCount ?? 0} waiting next.
           </p>
@@ -198,9 +198,9 @@ export default async function HomePage() {
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <div className="mt-3 flex items-center gap-2 text-xs text-muted">
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
               <Flame size={14} className="text-warning" />
-              <span>{streak} day streak</span>
+              <span className="text-safe-meta">{streak} day streak</span>
             </div>
           </div>
         </section>
@@ -235,14 +235,16 @@ export default async function HomePage() {
           <div className="grid gap-3">
             <Link
               href="/read"
-              className="glow-button flex items-center gap-4 rounded-[1.7rem] px-4 py-4 text-primary-foreground transition active:scale-[0.98]"
+              className="glow-button flex items-start gap-4 rounded-[1.7rem] px-4 py-4 text-primary-foreground transition active:scale-[0.98] sm:items-center"
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/20">
                 <BookOpen size={24} />
               </div>
-              <div>
-                <p className="font-semibold text-lg">Read something new</p>
-                <p className="text-sm opacity-80">Paste a link or bring your own text</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-safe-title text-lg font-semibold">Read something new</p>
+                <p className="text-safe-body text-sm opacity-80">
+                  Paste a link or bring your own text
+                </p>
               </div>
             </Link>
 
@@ -294,20 +296,20 @@ export default async function HomePage() {
                   <Link
                     key={entry.article_id}
                     href={`/read/${entry.article_id}`}
-                    className="glass-panel flex items-start justify-between gap-3 rounded-2xl p-4 transition active:scale-[0.98]"
+                    className="glass-panel flex items-start gap-3 rounded-2xl p-4 transition active:scale-[0.98]"
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs uppercase tracking-wide text-primary">
+                      <p className="chip-truncate inline-block max-w-full text-xs uppercase tracking-wide text-primary">
                         {articleMeta?.source_name ?? "Article"}
                       </p>
-                      <p className="mt-1 font-semibold leading-snug">
+                      <p className="text-safe-title mt-1 line-clamp-2 font-semibold">
                         {articleMeta?.title ?? "Untitled article"}
                       </p>
-                      <p className="mt-2 text-xs text-muted">
+                      <p className="text-safe-meta mt-2 text-xs text-muted">
                         {formatRelativeTime(entry.updated_at)}
                       </p>
                     </div>
-                    <div className="glass-chip rounded-full px-3 py-1 text-xs text-muted">
+                    <div className="glass-chip shrink-0 self-start rounded-full px-3 py-1 text-xs text-muted">
                       {entry.last_position && entry.last_position > 0 ? "Resume" : "Open"}
                     </div>
                   </Link>

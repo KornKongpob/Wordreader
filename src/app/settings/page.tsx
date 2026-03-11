@@ -227,8 +227,8 @@ export default function SettingsPage() {
             Account
           </h2>
           <div className="glass-panel rounded-2xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="glass-chip flex h-10 w-10 items-center justify-center rounded-full text-primary">
+            <div className="flex items-start gap-3">
+              <div className="glass-chip flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-primary">
                 <User size={18} className="text-primary" />
               </div>
               <div className="min-w-0 flex-1">
@@ -271,12 +271,12 @@ export default function SettingsPage() {
             Reading defaults
           </h2>
           <div className="glass-panel space-y-4 rounded-2xl p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-2">
                 <BookOpen size={16} className="text-muted" />
-                <span className="text-sm">Font size</span>
+                <span className="text-safe-title text-sm">Font size</span>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 self-stretch sm:self-auto">
                 <button
                   type="button"
                   onClick={() => handleFontSizeChange(Math.max(14, defaultFontSize - 2))}
@@ -295,9 +295,9 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Line spacing</span>
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-safe-title text-sm">Line spacing</span>
+              <div className="flex flex-wrap items-center gap-2">
                 {[1.4, 1.6, 1.8, 2.0].map((value) => (
                   <button
                     key={value}
@@ -315,9 +315,9 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Lookup style</span>
-              <div className="flex gap-2">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-safe-title text-sm">Lookup style</span>
+              <div className="flex flex-wrap gap-2">
                 {(["word", "phrase"] as const).map((mode) => (
                   <button
                     key={mode}
@@ -342,15 +342,17 @@ export default function SettingsPage() {
             Practice
           </h2>
           <div className="glass-panel space-y-4 rounded-2xl p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-start gap-2">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 flex-1 items-start gap-2">
                 <RotateCcw size={16} className="mt-0.5 text-primary" />
-                <div>
-                  <p className="text-sm font-medium">Daily review goal</p>
-                  <p className="text-xs text-muted">How many cards you want to clear per day.</p>
+                <div className="min-w-0">
+                  <p className="text-safe-title text-sm font-medium">Daily review goal</p>
+                  <p className="text-safe-meta text-xs text-muted">
+                    How many cards you want to clear per day.
+                  </p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 self-stretch sm:self-auto">
                 <button
                   type="button"
                   onClick={() => {
@@ -384,12 +386,12 @@ export default function SettingsPage() {
             Offline & reminders
           </h2>
           <div className="glass-panel space-y-4 rounded-2xl p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-2">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 flex-1 items-start gap-2">
                 <Cloud size={16} className="mt-0.5 text-primary" />
-                <div>
-                  <p className="text-sm font-medium">Offline article cache</p>
-                  <p className="text-xs text-muted">
+                <div className="min-w-0">
+                  <p className="text-safe-title text-sm font-medium">Offline article cache</p>
+                  <p className="text-safe-meta text-xs text-muted">
                     Save opened articles for reading when your connection drops.
                   </p>
                 </div>
@@ -401,7 +403,7 @@ export default function SettingsPage() {
                   setEnableOffline(next);
                   void saveSettings({ enable_offline: next });
                 }}
-                className={`rounded-full px-3 py-1 text-xs font-medium ${
+                className={`w-full rounded-full px-3 py-1 text-xs font-medium sm:w-auto ${
                   enableOffline
                     ? "glow-button text-primary-foreground"
                     : "glass-chip text-muted"
@@ -411,12 +413,12 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-2">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 flex-1 items-start gap-2">
                 <Bell size={16} className="mt-0.5 text-primary" />
-                <div>
-                  <p className="text-sm font-medium">Review reminders</p>
-                  <p className="text-xs text-muted">
+                <div className="min-w-0">
+                  <p className="text-safe-title text-sm font-medium">Review reminders</p>
+                  <p className="text-safe-meta text-xs text-muted">
                     Browser permission: {notificationState}
                   </p>
                 </div>
@@ -424,7 +426,7 @@ export default function SettingsPage() {
               <button
                 type="button"
                 onClick={() => void handleToggleNotifications()}
-                className={`rounded-full px-3 py-1 text-xs font-medium ${
+                className={`w-full rounded-full px-3 py-1 text-xs font-medium sm:w-auto ${
                   enableNotifications
                     ? "glow-button text-primary-foreground"
                     : "glass-chip text-muted"
@@ -434,10 +436,12 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium">Reminder time</p>
-                <p className="text-xs text-muted">Used for daily notification timing.</p>
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0 flex-1">
+                <p className="text-safe-title text-sm font-medium">Reminder time</p>
+                <p className="text-safe-meta text-xs text-muted">
+                  Used for daily notification timing.
+                </p>
               </div>
               <select
                 value={reminderHour}
@@ -446,7 +450,7 @@ export default function SettingsPage() {
                   setReminderHour(next);
                   void saveSettings({ reminder_hour: next });
                 }}
-                className="glass-input rounded-xl px-3 py-2 text-sm outline-none"
+                className="glass-input w-full rounded-xl px-3 py-2 text-sm outline-none sm:w-auto"
               >
                 {reminderOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -470,7 +474,7 @@ export default function SettingsPage() {
         </section>
 
         <section>
-          <p className="text-center text-xs text-muted">
+          <p className="text-safe-meta text-center text-xs text-muted">
             WordReader v0.2.0 • Learn English from real reading sessions
           </p>
         </section>

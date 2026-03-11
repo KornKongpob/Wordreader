@@ -35,7 +35,7 @@ export default function SelectionActionBar({
                   {getModeLabel(mode)}
                 </span>
               </div>
-              <p className="line-clamp-2 text-sm font-medium leading-relaxed">{text}</p>
+              <p className="text-safe-body line-clamp-2 text-sm font-medium">{text}</p>
             </div>
 
             <button
@@ -52,7 +52,7 @@ export default function SelectionActionBar({
             <button
               type="button"
               onClick={onTranslate}
-              className="glow-button inline-flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-medium text-primary-foreground"
+              className="glow-button inline-flex min-h-[3.25rem] items-center justify-center gap-2 rounded-xl px-3 py-3 text-center text-sm font-medium text-primary-foreground"
             >
               <Languages size={16} />
               Translate
@@ -62,7 +62,7 @@ export default function SelectionActionBar({
               <button
                 type="button"
                 onClick={onExplain}
-                className="subtle-button inline-flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-medium text-foreground"
+                className="subtle-button inline-flex min-h-[3.25rem] items-center justify-center gap-2 rounded-xl px-3 py-3 text-center text-sm font-medium text-foreground"
               >
                 <Sparkles size={16} />
                 Explain

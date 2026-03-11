@@ -72,8 +72,8 @@ export default function OfflineReaderView({ article }: OfflineReaderViewProps) {
               </div>
               <div>
                 <p className="editorial-label mb-1">Offline Copy</p>
-                <p className="font-medium">Saved for focus reading</p>
-                <p className="mt-1 text-sm text-muted">
+                <p className="text-safe-title font-medium">Saved for focus reading</p>
+                <p className="text-safe-body mt-1 text-sm text-muted">
                   This saved version stays readable without a network connection.
                   Word lookup and sync features resume when you&apos;re back online.
                 </p>
@@ -84,18 +84,20 @@ export default function OfflineReaderView({ article }: OfflineReaderViewProps) {
           <header className="glass-panel rounded-[2rem] p-5 sm:p-6">
             <p className="editorial-label mb-2">Saved Article</p>
             <h1
-              className="max-w-3xl font-semibold leading-tight tracking-[-0.03em]"
+              className="text-safe-title max-w-3xl font-semibold tracking-[-0.03em]"
               style={{ fontSize: fontSize + 8 }}
             >
               {article.title}
             </h1>
 
             <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted">
-              <span className="glass-chip rounded-full px-3 py-1.5 font-medium text-primary">
-                {article.source_name}
+              <span className="glass-chip max-w-full rounded-full px-3 py-1.5 font-medium text-primary">
+                <span className="chip-truncate">{article.source_name}</span>
               </span>
               {article.author && (
-                <span className="glass-chip rounded-full px-3 py-1.5">{article.author}</span>
+                <span className="glass-chip max-w-full rounded-full px-3 py-1.5">
+                  <span className="chip-truncate">{article.author}</span>
+                </span>
               )}
               {formattedDate && (
                 <span className="glass-chip rounded-full px-3 py-1.5">{formattedDate}</span>

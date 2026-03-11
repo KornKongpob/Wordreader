@@ -310,21 +310,21 @@ export default function ReviewPage() {
               <RotateCcw size={32} className="text-primary" />
             </div>
             <p className="font-medium mb-1">No words due right now</p>
-            <p className="mb-4 text-sm text-muted">
+            <p className="text-safe-body mb-4 text-sm text-muted">
               {offlineSession
                 ? "Your offline deck is empty. Open more words while online to cache a practice set."
                 : "Save words from articles and they&apos;ll show up here when it&apos;s time to review."}
             </p>
-            <div className="flex gap-3">
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
               <Link
                 href="/read"
-                className="glow-button rounded-xl px-4 py-2 text-sm font-medium text-primary-foreground"
+                className="glow-button rounded-xl px-4 py-2 text-center text-sm font-medium text-primary-foreground"
               >
                 Read an article
               </Link>
               <Link
                 href="/vocabulary"
-                className="subtle-button rounded-xl px-4 py-2 text-sm font-medium"
+                className="subtle-button rounded-xl px-4 py-2 text-center text-sm font-medium"
               >
                 Organize words
               </Link>
@@ -354,16 +354,16 @@ export default function ReviewPage() {
               </div>
               <p className="text-sm text-muted">{streak} day streak active</p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
               <Link
                 href="/"
-                className="subtle-button rounded-xl px-4 py-2 text-sm font-medium"
+                className="subtle-button rounded-xl px-4 py-2 text-center text-sm font-medium"
               >
                 Home
               </Link>
               <Link
                 href="/read"
-                className="glow-button rounded-xl px-4 py-2 text-sm font-medium text-primary-foreground"
+                className="glow-button rounded-xl px-4 py-2 text-center text-sm font-medium text-primary-foreground"
               >
                 Read more
               </Link>
@@ -403,7 +403,7 @@ export default function ReviewPage() {
             />
           </div>
           {offlineSession && (
-            <p className="mt-3 text-xs text-muted">
+            <p className="text-safe-body mt-3 text-xs text-muted">
               Working from your cached deck. Ratings move this session forward, but only online sessions sync your schedule.
             </p>
           )}

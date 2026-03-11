@@ -288,10 +288,12 @@ export default function VocabularyDetailPage() {
 
         <section className="glass-hero rounded-[2rem] p-5">
           <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="editorial-label mb-2">Vocabulary Spotlight</p>
-              <div className="mb-2 flex items-center gap-2">
-                <h1 className="text-3xl font-semibold tracking-[-0.03em]">{item.word}</h1>
+              <div className="mb-2 flex flex-wrap items-start gap-2">
+                <h1 className="text-safe-title line-clamp-3 text-3xl font-semibold tracking-[-0.03em]">
+                  {item.word}
+                </h1>
                 {starred && <Star size={16} className="fill-warning text-warning" />}
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -329,8 +331,8 @@ export default function VocabularyDetailPage() {
               <SpeakButton text={contexts[0].original_sentence} label="Latest sentence" />
             )}
             {item.last_source_name && (
-              <span className="glass-chip rounded-full px-3 py-1.5 text-xs text-muted">
-                {item.last_source_name}
+              <span className="glass-chip max-w-full rounded-full px-3 py-1.5 text-xs text-muted">
+                <span className="chip-truncate">{item.last_source_name}</span>
               </span>
             )}
           </div>
@@ -339,12 +341,12 @@ export default function VocabularyDetailPage() {
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="glass-panel rounded-[1.75rem] p-4">
             <p className="editorial-label mb-2">Thai Meaning</p>
-            <p className="text-lg font-medium">{item.thai_meaning}</p>
+            <p className="text-safe-title text-lg font-medium">{item.thai_meaning}</p>
           </div>
 
           <div className="glass-panel rounded-[1.75rem] p-4">
             <p className="editorial-label mb-2">English Meaning</p>
-            <p className="text-sm leading-relaxed">{item.english_meaning}</p>
+            <p className="text-safe-body text-sm">{item.english_meaning}</p>
           </div>
         </div>
 
@@ -358,18 +360,20 @@ export default function VocabularyDetailPage() {
           </div>
 
           <div className="space-y-3">
-            <div className="glass-chip flex items-center justify-between rounded-[1.35rem] px-4 py-3">
-              <div className="flex items-start gap-2">
+            <div className="glass-chip flex flex-col gap-3 rounded-[1.35rem] px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 flex-1 items-start gap-2">
                 <FolderOpen size={16} className="mt-0.5 text-muted" />
-                <div>
-                  <p className="text-sm font-medium">Favorite this word</p>
-                  <p className="text-xs text-muted">Keep important words easy to find.</p>
+                <div className="min-w-0">
+                  <p className="text-safe-title text-sm font-medium">Favorite this word</p>
+                  <p className="text-safe-meta text-xs text-muted">
+                    Keep important words easy to find.
+                  </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setStarred((current) => !current)}
-                className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                className={`w-full rounded-full px-3 py-1.5 text-xs font-medium transition sm:w-auto ${
                   starred
                     ? "glow-button text-primary-foreground"
                     : "subtle-button text-muted hover:text-foreground"
@@ -458,7 +462,7 @@ export default function VocabularyDetailPage() {
                       key={`${event.reviewed_at}-${event.rating}`}
                       className="glass-chip flex items-center justify-between rounded-[1.15rem] px-3 py-2 text-sm"
                     >
-                      <span className="font-medium capitalize">{event.rating}</span>
+                      <span className="text-safe-title font-medium capitalize">{event.rating}</span>
                       <span className="text-xs text-muted">
                         {new Date(event.reviewed_at).toLocaleDateString("en-US", {
                           month: "short",
@@ -482,7 +486,7 @@ export default function VocabularyDetailPage() {
                   key={context.id}
                   className="glass-panel space-y-3 rounded-[1.75rem] p-4"
                 >
-                  <p className="text-sm italic leading-relaxed">
+                  <p className="text-safe-body text-sm italic">
                     &ldquo;{context.original_sentence}&rdquo;
                   </p>
                   {context.contextual_meaning && (
@@ -492,7 +496,7 @@ export default function VocabularyDetailPage() {
                     </p>
                   )}
                   {context.context_explanation && (
-                    <p className="text-xs leading-relaxed text-muted">
+                    <p className="text-safe-meta text-xs text-muted">
                       {context.context_explanation}
                     </p>
                   )}
@@ -500,9 +504,9 @@ export default function VocabularyDetailPage() {
                     <div className="flex flex-wrap items-center gap-2 pt-1">
                       <Link
                         href={`/read/${context.article.id}`}
-                        className="glass-chip truncate rounded-full px-3 py-1.5 text-xs text-primary transition hover:text-foreground"
+                        className="glass-chip max-w-full rounded-full px-3 py-1.5 text-xs text-primary transition hover:text-foreground sm:max-w-[70%]"
                       >
-                        {context.article.title}
+                        <span className="chip-truncate">{context.article.title}</span>
                       </Link>
                       <span className="glass-chip rounded-full px-3 py-1.5 text-xs text-muted">
                         {context.article.source_name}

@@ -481,52 +481,54 @@ export default function ReaderView({ article }: ReaderViewProps) {
           <header className="glass-panel mb-6 rounded-[2rem] p-5">
             <div className="mb-4 flex flex-wrap items-center gap-2">
               {savedVocabulary.length > 0 && (
-                <span className="glass-chip inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium text-primary">
+                <span className="glass-chip inline-flex max-w-full items-center gap-1 rounded-full px-3 py-1 text-xs font-medium text-primary">
                   <BookMarked size={12} />
-                  {savedVocabulary.length} saved words highlighted
+                  <span className="chip-truncate">
+                    {savedVocabulary.length} saved words highlighted
+                  </span>
                 </span>
               )}
               {resumePosition !== null && (
                 <button
                   type="button"
                   onClick={handleResume}
-                  className="glass-chip inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium text-muted hover:text-foreground"
+                  className="glass-chip inline-flex max-w-full items-center gap-1 rounded-full px-3 py-1 text-xs font-medium text-muted hover:text-foreground"
                 >
                   <RotateCcw size={12} />
-                  Resume where you left off
+                  <span className="chip-truncate">Resume where you left off</span>
                 </button>
               )}
             </div>
 
             {syncNotice && (
-              <div className="mb-4 rounded-[1.2rem] bg-warning/10 px-3 py-2 text-sm text-warning">
+              <div className="text-safe-body mb-4 rounded-[1.2rem] bg-warning/10 px-3 py-2 text-sm text-warning">
                 {syncNotice}
               </div>
             )}
 
             <p className="editorial-label mb-2">Reader View</p>
             <h1
-              className="mb-3 font-bold leading-tight tracking-tight"
+              className="text-safe-title mb-3 font-bold tracking-tight"
               style={{ fontSize: fontSize + 6 }}
             >
               {article.title}
             </h1>
 
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
-              <span className="glass-chip rounded-full px-3 py-1 text-xs font-medium text-primary">
-                {article.source_name}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted">
+              <span className="glass-chip max-w-full rounded-full px-3 py-1 text-xs font-medium text-primary">
+                <span className="chip-truncate">{article.source_name}</span>
               </span>
-              {article.author && <span>{article.author}</span>}
-              {formattedDate && <span>{formattedDate}</span>}
+              {article.author && <span className="text-safe-meta">{article.author}</span>}
+              {formattedDate && <span className="text-safe-meta">{formattedDate}</span>}
             </div>
 
             <a
               href={article.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-2 inline-flex items-center gap-1 text-xs text-muted transition hover:text-primary"
+              className="mt-2 inline-flex max-w-full items-center gap-1 text-xs text-muted transition hover:text-primary"
             >
-              View original <ExternalLink size={12} />
+              <span className="chip-truncate">View original</span> <ExternalLink size={12} />
             </a>
           </header>
 
@@ -568,7 +570,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
       {!selection && selectionNotice && !lookupRequest && !savedWordPreview && (
         <div className="fixed bottom-0 left-0 right-0 z-30 pb-safe">
           <div className="mx-auto max-w-lg px-4 pb-4">
-            <div className="glass-panel rounded-xl px-4 py-3 text-sm text-warning">
+            <div className="glass-panel text-safe-body rounded-xl px-4 py-3 text-sm text-warning">
               {selectionNotice}
             </div>
           </div>

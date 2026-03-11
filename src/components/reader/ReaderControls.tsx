@@ -105,24 +105,24 @@ export default function ReaderControls({
 
       {showPanel && (
         <div className="px-3 pb-3">
-          <div className="glass-panel mx-auto max-w-2xl rounded-[1.5rem] px-4 py-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
+          <div className="glass-panel mx-auto max-w-2xl space-y-4 rounded-[1.5rem] px-4 py-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
                 <p className="editorial-label mb-1">Reader Controls</p>
-                <span className="text-sm font-medium">Reading Settings</span>
+                <span className="text-safe-title text-sm font-medium">Reading Settings</span>
               </div>
               <button
                 onClick={() => setShowPanel(false)}
-                className="subtle-button rounded-xl p-1.5 text-muted hover:text-foreground"
+                className="subtle-button shrink-0 rounded-xl p-1.5 text-muted hover:text-foreground"
               >
                 <X size={16} />
               </button>
             </div>
 
             {/* Font size */}
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted">Font Size</span>
-              <div className="flex items-center gap-3">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-safe-meta text-sm text-muted">Font Size</span>
+              <div className="flex items-center gap-3 self-stretch sm:self-auto">
                 <button
                   onClick={() => onFontSizeChange(Math.max(14, fontSize - 2))}
                   className="subtle-button flex h-8 w-8 items-center justify-center rounded-lg text-muted transition hover:text-foreground"
@@ -142,9 +142,9 @@ export default function ReaderControls({
             </div>
 
             {/* Line spacing */}
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted">Line Spacing</span>
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-safe-meta text-sm text-muted">Line Spacing</span>
+              <div className="flex flex-wrap items-center gap-2">
                 {[1.4, 1.6, 1.8, 2.0].map((val) => (
                   <button
                     key={val}
@@ -161,9 +161,9 @@ export default function ReaderControls({
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted">Lookup Style</span>
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-safe-meta text-sm text-muted">Lookup Style</span>
+              <div className="flex flex-wrap items-center gap-2">
                 {(["word", "phrase"] as const).map((mode) => (
                   <button
                     key={mode}

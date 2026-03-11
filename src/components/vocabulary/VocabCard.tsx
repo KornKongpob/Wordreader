@@ -51,14 +51,14 @@ export default function VocabCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="mb-1 flex items-center gap-2">
-            <p className="truncate font-semibold">{word}</p>
+          <div className="mb-1 flex flex-wrap items-start gap-x-2 gap-y-1">
+            <p className="text-safe-title line-clamp-2 min-w-0 flex-1 font-semibold">{word}</p>
             {starred && <Star size={14} className="fill-warning text-warning" />}
             {part_of_speech && (
               <span className="shrink-0 text-xs text-muted">{part_of_speech}</span>
             )}
           </div>
-          <p className="truncate text-sm text-muted">{thai_meaning}</p>
+          <p className="text-safe-body line-clamp-2 text-sm text-muted">{thai_meaning}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
             {due_now && (
               <span className="glass-chip inline-flex items-center gap-1 rounded-full px-2 py-1 text-primary">
@@ -73,8 +73,8 @@ export default function VocabCard({
               </span>
             )}
             {last_source_name && (
-              <span className="glass-chip rounded-full px-2 py-1 text-muted">
-                {last_source_name}
+              <span className="glass-chip max-w-full rounded-full px-2 py-1 text-muted sm:max-w-[12rem]">
+                <span className="chip-truncate">{last_source_name}</span>
               </span>
             )}
             {tags.slice(0, 2).map((tag) => (
@@ -87,7 +87,7 @@ export default function VocabCard({
             ))}
           </div>
           {notes.trim() && (
-            <p className="mt-3 line-clamp-2 text-xs text-muted">{notes.trim()}</p>
+            <p className="text-safe-body mt-3 line-clamp-2 text-xs text-muted">{notes.trim()}</p>
           )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">

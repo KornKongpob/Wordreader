@@ -196,9 +196,9 @@ export default function VocabList() {
     <div className="space-y-4">
       <div className="glass-panel rounded-[1.75rem] p-4">
         <div className="mb-3 flex items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="editorial-label mb-1">Find And Organize</p>
-            <p className="text-sm text-muted">
+            <p className="text-safe-body text-sm text-muted">
               Search by meaning, source, note, folder, or review urgency.
             </p>
           </div>
@@ -223,7 +223,7 @@ export default function VocabList() {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search words, notes, or tags..."
-            className="glass-input w-full rounded-[1.35rem] py-3.5 pl-11 pr-24 text-[16px] text-foreground outline-none transition focus:ring-2 focus:ring-primary/35"
+            className="glass-input w-full rounded-[1.35rem] py-3.5 pl-11 pr-28 text-[16px] text-foreground outline-none transition focus:ring-2 focus:ring-primary/35"
           />
           <button
             type="button"
@@ -352,13 +352,13 @@ export default function VocabList() {
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-3 px-1">
+      <div className="flex flex-col items-start gap-1 px-1 sm:flex-row sm:items-center sm:justify-between">
         <p className="editorial-label">
           {filtered.length} word{filtered.length !== 1 ? "s" : ""}
           {hasActiveFilters ? " found" : " saved"}
         </p>
         {items.length > 0 && (
-          <span className="text-xs text-muted">
+          <span className="text-safe-meta text-xs text-muted">
             {dueOnly ? "Only showing words due now." : "Tap a word for notes and context."}
           </span>
         )}

@@ -33,10 +33,6 @@ function isSameText(a: string, b: string) {
   return normalizeLookupText(a).toLowerCase() === normalizeLookupText(b).toLowerCase();
 }
 
-function truncateText(value: string, limit = 180) {
-  return value.length > limit ? `${value.slice(0, limit)}...` : value;
-}
-
 function getSheetLabel(result: LookupRequest) {
   if (result.mode === "paragraph") {
     return result.intent === "explain" ? "Paragraph Coach" : "Paragraph Translation";
@@ -281,24 +277,24 @@ export default function VocabPopup({
   };
 
   const renderVocabularyResult = (translation: VocabularyLookupResult) => (
-    <div className="space-y-3">
+      <div className="space-y-3">
       <div className="glass-panel rounded-xl p-3">
         <p className="mb-1 text-xs text-muted">Thai</p>
-        <p className="text-lg font-medium">{translation.thai_meaning}</p>
+        <p className="text-safe-title text-lg font-medium">{translation.thai_meaning}</p>
       </div>
 
       <div className="glass-panel rounded-xl p-3">
         <p className="mb-1 text-xs text-muted">English ({translation.part_of_speech})</p>
-        <p className="text-sm">{translation.english_meaning}</p>
+        <p className="text-safe-body text-sm">{translation.english_meaning}</p>
       </div>
 
       <div className="glass-panel rounded-xl p-3">
         <p className="mb-1 text-xs text-muted">In this context</p>
-        <p className="text-sm">{translation.contextual_meaning}</p>
-        <p className="mt-2 text-xs text-muted">{translation.context_explanation}</p>
+        <p className="text-safe-body text-sm">{translation.contextual_meaning}</p>
+        <p className="text-safe-meta mt-2 text-xs text-muted">{translation.context_explanation}</p>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <span
           className={`rounded-full px-2 py-0.5 text-xs font-medium ${
             translation.difficulty === "easy"
@@ -310,8 +306,9 @@ export default function VocabPopup({
         >
           {translation.difficulty}
         </span>
-        <span className="glass-chip rounded-full px-3 py-1 text-xs text-muted">
-          Source: <span className="font-medium text-foreground">{articleSourceName}</span>
+        <span className="glass-chip max-w-full rounded-full px-3 py-1 text-xs text-muted">
+          Source:{" "}
+          <span className="chip-truncate font-medium text-foreground">{articleSourceName}</span>
         </span>
       </div>
 
@@ -351,12 +348,12 @@ export default function VocabPopup({
             onClick={() => handlePhraseLookup(item.phrase)}
             className="glass-chip flex w-full items-start justify-between gap-3 rounded-xl px-3 py-3 text-left transition hover:text-foreground"
           >
-            <div>
-              <p className="font-medium">{item.phrase}</p>
-              <p className="mt-1 text-sm text-muted">{item.explanation}</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-safe-title line-clamp-2 font-medium">{item.phrase}</p>
+              <p className="text-safe-body mt-1 text-sm text-muted">{item.explanation}</p>
             </div>
-            <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-              {item.thai_meaning}
+            <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+              <span className="chip-truncate max-w-24">{item.thai_meaning}</span>
             </span>
           </button>
         ))}
@@ -368,28 +365,30 @@ export default function VocabPopup({
     <div className="space-y-3">
       <div className="glass-panel rounded-xl p-3">
         <p className="mb-1 text-xs text-muted">Thai translation</p>
-        <p className="text-base font-medium leading-relaxed">{translation.thai_translation}</p>
+        <p className="text-safe-body text-base font-medium">{translation.thai_translation}</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="glass-panel rounded-xl p-3">
           <p className="mb-1 text-xs text-muted">Gist</p>
-          <p className="text-sm">{translation.gist}</p>
+          <p className="text-safe-body text-sm">{translation.gist}</p>
         </div>
         <div className="glass-panel rounded-xl p-3">
           <p className="mb-1 text-xs text-muted">Structure note</p>
-          <p className="text-sm">{translation.structure_note}</p>
+          <p className="text-safe-body text-sm">{translation.structure_note}</p>
         </div>
       </div>
 
       <div className="glass-panel rounded-xl p-3">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
+        <div className="mb-3 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 flex-1">
             <p className="text-xs text-muted">Key phrases</p>
-            <p className="text-xs text-muted">Tap a phrase to inspect it like vocabulary.</p>
+            <p className="text-safe-meta text-xs text-muted">
+              Tap a phrase to inspect it like vocabulary.
+            </p>
           </div>
-          <span className="glass-chip rounded-full px-3 py-1 text-xs text-muted">
-            {articleSourceName}
+          <span className="glass-chip max-w-full rounded-full px-3 py-1 text-xs text-muted">
+            <span className="chip-truncate">{articleSourceName}</span>
           </span>
         </div>
         {renderPhraseList(translation.key_phrases)}
@@ -401,12 +400,12 @@ export default function VocabPopup({
     <div className="space-y-3">
       <div className="glass-panel rounded-xl p-3">
         <p className="mb-1 text-xs text-muted">Thai translation</p>
-        <p className="text-base font-medium leading-relaxed">{translation.thai_translation}</p>
+        <p className="text-safe-body text-base font-medium">{translation.thai_translation}</p>
       </div>
 
       <div className="glass-panel rounded-xl p-3">
         <p className="mb-1 text-xs text-muted">Gist</p>
-        <p className="text-sm">{translation.gist}</p>
+        <p className="text-safe-body text-sm">{translation.gist}</p>
       </div>
 
       <div className="glass-panel rounded-xl p-3">
@@ -417,20 +416,22 @@ export default function VocabPopup({
               key={point}
               className="glass-chip rounded-xl px-3 py-2 text-sm text-muted"
             >
-              {point}
+              <span className="text-safe-body">{point}</span>
             </div>
           ))}
         </div>
       </div>
 
       <div className="glass-panel rounded-xl p-3">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
+        <div className="mb-3 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 flex-1">
             <p className="text-xs text-muted">Key phrases</p>
-            <p className="text-xs text-muted">Tap a phrase to inspect it like vocabulary.</p>
+            <p className="text-safe-meta text-xs text-muted">
+              Tap a phrase to inspect it like vocabulary.
+            </p>
           </div>
-          <span className="glass-chip rounded-full px-3 py-1 text-xs text-muted">
-            {articleSourceName}
+          <span className="glass-chip max-w-full rounded-full px-3 py-1 text-xs text-muted">
+            <span className="chip-truncate">{articleSourceName}</span>
           </span>
         </div>
         {renderPhraseList(translation.key_phrases)}
@@ -450,11 +451,11 @@ export default function VocabPopup({
         <div className="space-y-3">
           <div className="glass-panel rounded-xl p-3">
             <p className="mb-1 text-xs text-muted">Thai translation</p>
-            <p className="text-base font-medium leading-relaxed">{result.thai_translation}</p>
+            <p className="text-safe-body text-base font-medium">{result.thai_translation}</p>
           </div>
           <div className="glass-panel rounded-xl p-3">
             <p className="mb-1 text-xs text-muted">Gist</p>
-            <p className="text-sm">{result.gist}</p>
+            <p className="text-safe-body text-sm">{result.gist}</p>
           </div>
         </div>
       );
@@ -469,11 +470,11 @@ export default function VocabPopup({
         <div className="space-y-3">
           <div className="glass-panel rounded-xl p-3">
             <p className="mb-1 text-xs text-muted">Thai translation</p>
-            <p className="text-base font-medium leading-relaxed">{result.thai_translation}</p>
+            <p className="text-safe-body text-base font-medium">{result.thai_translation}</p>
           </div>
           <div className="glass-panel rounded-xl p-3">
             <p className="mb-1 text-xs text-muted">Gist</p>
-            <p className="text-sm">{result.gist}</p>
+            <p className="text-safe-body text-sm">{result.gist}</p>
           </div>
         </div>
       );
@@ -503,16 +504,14 @@ export default function VocabPopup({
           <div className="mb-4 flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <p className="editorial-label mb-2">{getSheetLabel(activeLookup)}</p>
-              <h3 className="text-base font-bold leading-snug">
-                {truncateText(activeLookup.text, activeLookup.mode === "paragraph" ? 220 : 120)}
+              <h3 className="text-safe-title line-clamp-3 text-base font-bold">
+                {activeLookup.text}
               </h3>
-              <p className="mt-1 line-clamp-4 text-sm text-muted">
+              <p className="text-safe-body mt-1 line-clamp-4 text-sm text-muted">
                 &ldquo;...
-                {truncateText(
-                  activeLookup.mode === "paragraph"
-                    ? activeLookup.paragraph
-                    : activeLookup.sentence
-                )}
+                {activeLookup.mode === "paragraph"
+                  ? activeLookup.paragraph
+                  : activeLookup.sentence}
                 &rdquo;
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">

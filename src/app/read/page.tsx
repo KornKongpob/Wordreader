@@ -257,8 +257,8 @@ export default function ReadPage() {
             <Upload size={18} className="text-primary" />
             <div>
               <p className="editorial-label mb-1">Import A Story</p>
-              <h1 className="text-xl font-bold">Read an article</h1>
-              <p className="text-sm text-muted">
+              <h1 className="text-safe-title text-xl font-bold">Read an article</h1>
+              <p className="text-safe-body text-sm text-muted">
                 Bring in a URL or paste text you want to study.
               </p>
             </div>
@@ -335,7 +335,7 @@ export default function ReadPage() {
                 disabled={loading}
                 className="glass-input w-full rounded-xl px-4 py-3 text-[16px] outline-none transition focus:ring-2 focus:ring-primary/40"
               />
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <input
                   type="text"
                   value={manualSource}
@@ -394,7 +394,9 @@ export default function ReadPage() {
             <h2 className="text-sm font-medium uppercase tracking-wide text-muted">
               Continue reading
             </h2>
-            <span className="text-xs text-muted">{continueReading.length} in progress</span>
+            <span className="text-safe-meta text-xs text-muted">
+              {continueReading.length} in progress
+            </span>
           </div>
           {continueReading.length === 0 ? (
             <div className="glass-panel rounded-2xl p-5 text-center">
@@ -410,25 +412,25 @@ export default function ReadPage() {
 
                 return (
                   <button
-                  key={item.article_id}
-                  type="button"
-                  onClick={() => router.push(`/read/${item.article_id}`)}
-                  className="glass-panel w-full rounded-2xl p-4 text-left transition active:scale-[0.98]"
-                >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-xs uppercase tracking-wide text-primary">
+                    key={item.article_id}
+                    type="button"
+                    onClick={() => router.push(`/read/${item.article_id}`)}
+                    className="glass-panel w-full rounded-2xl p-4 text-left transition active:scale-[0.98]"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="chip-truncate inline-block max-w-full text-xs uppercase tracking-wide text-primary">
                           {articleMeta?.source_name ?? "Article"}
                         </p>
-                        <p className="mt-1 font-semibold leading-snug">
+                        <p className="text-safe-title mt-1 line-clamp-2 font-semibold">
                           {articleMeta?.title ?? "Untitled article"}
                         </p>
                       </div>
-                      <span className="glass-chip rounded-full px-3 py-1 text-xs text-muted">
+                      <span className="glass-chip shrink-0 self-start rounded-full px-3 py-1 text-xs text-muted">
                         Resume
                       </span>
                     </div>
-                    <p className="mt-2 text-xs text-muted">
+                    <p className="text-safe-meta mt-2 text-xs text-muted">
                       {formatRelativeTime(item.updated_at)}
                     </p>
                   </button>
@@ -461,14 +463,14 @@ export default function ReadPage() {
                   onClick={() => router.push(`/read/offline/${article.id}`)}
                   className="glass-panel w-full rounded-2xl p-4 text-left transition active:scale-[0.98]"
                 >
-                  <p className="text-xs uppercase tracking-wide text-primary">
+                  <p className="chip-truncate inline-block max-w-full text-xs uppercase tracking-wide text-primary">
                     {article.source_name}
                   </p>
-                  <p className="mt-1 font-semibold leading-snug">{article.title}</p>
-                  <p className="mt-2 text-xs text-muted">
+                  <p className="text-safe-title mt-1 line-clamp-2 font-semibold">{article.title}</p>
+                  <p className="text-safe-body mt-2 text-xs text-muted">
                     Opens with the full reader when you&apos;re online, and falls back to the saved copy if needed.
                   </p>
-                  <p className="mt-2 text-xs text-muted">
+                  <p className="text-safe-meta mt-2 text-xs text-muted">
                     Cached {formatRelativeTime(article.cached_at).replace("Updated ", "")}
                   </p>
                 </button>

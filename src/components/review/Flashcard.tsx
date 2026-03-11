@@ -64,9 +64,9 @@ export default function Flashcard({
         {!flipped ? (
           <>
             <p className="editorial-label mb-3">Flashcard</p>
-            <p className="mb-3 text-2xl font-bold">{word}</p>
+            <p className="text-safe-title mb-3 text-2xl font-bold">{word}</p>
             {part_of_speech && (
-              <p className="mb-4 text-sm italic text-muted">{part_of_speech}</p>
+              <p className="text-safe-meta mb-4 text-sm italic text-muted">{part_of_speech}</p>
             )}
             <div className="mb-4 flex flex-wrap justify-center gap-2">
               <SpeakButton text={word} label="Word audio" />
@@ -75,7 +75,7 @@ export default function Flashcard({
               )}
             </div>
             {example_sentence && (
-              <p className="max-w-sm text-sm leading-relaxed text-muted">
+              <p className="text-safe-body max-w-sm text-sm text-muted">
                 &ldquo;{example_sentence}&rdquo;
               </p>
             )}
@@ -87,12 +87,12 @@ export default function Flashcard({
             ) : (
           <>
             <p className="editorial-label mb-2">Meaning</p>
-            <p className="mb-1 text-lg font-bold">{word}</p>
+            <p className="text-safe-title mb-1 text-lg font-bold">{word}</p>
             <div className="my-3 h-0.5 w-12 rounded-full bg-primary/20" />
-            <p className="mb-2 text-xl">{thai_meaning}</p>
-            <p className="mb-4 text-sm text-muted">{english_meaning}</p>
+            <p className="text-safe-title mb-2 text-xl">{thai_meaning}</p>
+            <p className="text-safe-body mb-4 text-sm text-muted">{english_meaning}</p>
             {contextual_meaning && (
-              <p className="max-w-sm text-xs leading-relaxed text-muted">
+              <p className="text-safe-body max-w-sm text-xs text-muted">
                 {contextual_meaning}
               </p>
             )}
@@ -107,7 +107,7 @@ export default function Flashcard({
               setFlipped(false);
               onRate("again");
             }}
-            className="subtle-button rounded-xl py-3 text-sm font-medium text-foreground transition active:scale-[0.97]"
+            className="subtle-button flex min-h-[3.25rem] items-center justify-center rounded-xl px-3 py-3 text-center text-sm font-medium text-foreground transition active:scale-[0.97]"
           >
             Again today
           </button>
@@ -116,7 +116,7 @@ export default function Flashcard({
               setFlipped(false);
               onRate("hard");
             }}
-            className="glass-chip rounded-xl py-3 text-sm font-medium text-danger transition active:scale-[0.97]"
+            className="glass-chip flex min-h-[3.25rem] items-center justify-center rounded-xl px-3 py-3 text-center text-sm font-medium text-danger transition active:scale-[0.97]"
           >
             Hard
           </button>
@@ -125,7 +125,7 @@ export default function Flashcard({
               setFlipped(false);
               onRate("medium");
             }}
-            className="glass-chip rounded-xl py-3 text-sm font-medium text-warning transition active:scale-[0.97]"
+            className="glass-chip flex min-h-[3.25rem] items-center justify-center rounded-xl px-3 py-3 text-center text-sm font-medium text-warning transition active:scale-[0.97]"
           >
             Medium
           </button>
@@ -134,7 +134,7 @@ export default function Flashcard({
               setFlipped(false);
               onRate("easy");
             }}
-            className="glass-chip rounded-xl py-3 text-sm font-medium text-success transition active:scale-[0.97]"
+            className="glass-chip flex min-h-[3.25rem] items-center justify-center rounded-xl px-3 py-3 text-center text-sm font-medium text-success transition active:scale-[0.97]"
           >
             Easy
           </button>
