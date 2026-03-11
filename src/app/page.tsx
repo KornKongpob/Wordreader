@@ -1,4 +1,5 @@
 import AppShell from "@/components/layout/AppShell";
+import LatestHeadlines from "@/components/home/LatestHeadlines";
 import OnboardingChecklist from "@/components/home/OnboardingChecklist";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
@@ -184,7 +185,7 @@ export default async function HomePage() {
           </h1>
           <p className="text-safe-body mt-2 text-sm text-muted">
             You&apos;ve reviewed {reviewedCount}/{reviewGoal} cards today and have{" "}
-            {dueCount ?? 0} waiting next.
+            {dueCount ?? 0} waiting next. Fresh headlines are ready whenever you want a new article.
           </p>
 
           <div className="glass-panel mt-5 rounded-2xl p-4">
@@ -241,9 +242,9 @@ export default async function HomePage() {
                 <BookOpen size={24} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-safe-title text-lg font-semibold">Read something new</p>
+                <p className="text-safe-title text-lg font-semibold">Browse today&apos;s news</p>
                 <p className="text-safe-body text-sm opacity-80">
-                  Paste a link or bring your own text
+                  Discover live headlines, then open the ones you want to study
                 </p>
               </div>
             </Link>
@@ -268,6 +269,8 @@ export default async function HomePage() {
             </div>
           </div>
         </section>
+
+        <LatestHeadlines />
 
         <section>
           <div className="mb-3 flex items-center justify-between">

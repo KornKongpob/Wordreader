@@ -3,18 +3,24 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/layout/AppShell";
+import NewsPreviewSheet from "@/components/news/NewsPreviewSheet";
+import { NEWS_SECTIONS } from "@/lib/news-sources";
+import { useArticleImport } from "@/hooks/useArticleImport";
+import { useNewsFeed } from "@/hooks/useNewsFeed";
 import {
   AlertCircle,
+  ArrowRight,
   BookOpen,
   BookOpenText,
   FileText,
   Globe,
   Loader2,
+  Radio,
   Upload,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getOfflineArticles, type OfflineArticleRecord } from "@/lib/offline";
-import { getUserWithProfile } from "@/lib/supabase/ensureProfile";
+import type { NewsFeedItem } from "@/types";
 
 interface RecentArticle {
   article_id: string;
@@ -39,7 +45,7 @@ interface RecentArticle {
 
 type ImportMode = "url" | "text";
 
-function formatRelativeTime(value?: string) {
+function formatRelativeTime(value?: string | null) {
   if (!value) return "Just added";
 
   const diffMs = Date.now() - new Date(value).getTime();
@@ -88,10 +94,18 @@ export default function ReadPage() {
   const [manualSource, setManualSource] = useState("Personal import");
   const [manualUrl, setManualUrl] = useState("");
   const [manualText, setManualText] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [manualSubmitting, setManualSubmitting] = useState(false);
   const [recentArticles, setRecentArticles] = useState<RecentArticle[]>([]);
   const [offlineArticles, setOfflineArticles] = useState<OfflineArticleRecord[]>([]);
+  const [selectedNewsItem, setSelectedNewsItem] = useState<NewsFeedItem | null>(null);
+  const { items: newsItems, warnings, loading: newsLoading, error: newsError } = useNewsFeed("all");
+  const {
+    importing,
+    error: importError,
+    setError,
+    importFromUrl,
+    saveArticleAndOpen,
+  } = useArticleImport();
 
   useEffect(() => {
     const loadLibrary = async () => {
@@ -130,106 +144,25 @@ export default function ReadPage() {
     () => recentArticles.filter((item) => !item.is_finished).slice(0, 4),
     [recentArticles]
   );
-
-  const saveArticleAndOpen = async (article: {
-    url: string;
-    title: string;
-    source_name: string;
-    author: string | null;
-    published_at: string | null;
-    image_url: string | null;
-    content: string;
-    description?: string;
-  }) => {
-    const supabase = createClient();
-    if (!supabase) {
-      setError("Supabase is not configured. Check environment variables.");
-      return;
-    }
-
-    const { user, error: userError } = await getUserWithProfile(supabase);
-
-    if (!user || userError) {
-      setError(userError || "Please sign in again to continue.");
-      return;
-    }
-
-    const { data: existing } = await supabase
-      .from("articles")
-      .select("id")
-      .eq("url", article.url)
-      .maybeSingle();
-
-    let articleId = existing?.id;
-
-    if (!articleId) {
-      const { data: inserted, error: insertError } = await supabase
-        .from("articles")
-        .insert({
-          url: article.url,
-          title: article.title,
-          description: article.description ?? "",
-          source_name: article.source_name,
-          author: article.author,
-          published_at: article.published_at,
-          image_url: article.image_url,
-          content: article.content,
-        })
-        .select("id")
-        .single();
-
-      if (insertError || !inserted) {
-        setError("Could not save this article. Please try again.");
-        return;
-      }
-
-      articleId = inserted.id;
-    }
-
-    await supabase.from("reading_history").upsert(
-      {
-        user_id: user.id,
-        article_id: articleId,
-        read_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id,article_id" }
-    );
-
-    router.push(`/read/${articleId}`);
-  };
+  const featuredStory = newsItems[0] ?? null;
+  const topStories = useMemo(() => newsItems.slice(0, 5), [newsItems]);
+  const isBusy = importing || manualSubmitting;
 
   const handleUrlSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
-    setLoading(true);
 
     try {
-      const response = await fetch("/api/extract", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim() }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || "Something went wrong.");
-        setLoading(false);
-        return;
-      }
-
-      await saveArticleAndOpen(data.article);
+      await importFromUrl(url.trim());
     } catch {
-      setError("Network error. Please check your connection and try again.");
+      return;
     }
-
-    setLoading(false);
   };
 
   const handleManualSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
-    setLoading(true);
+    setManualSubmitting(true);
 
     try {
       await saveArticleAndOpen({
@@ -242,24 +175,195 @@ export default function ReadPage() {
         image_url: null,
         content: textToHtml(manualText),
       });
-    } catch {
-      setError("Could not import this text right now.");
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Could not import this text right now."
+      );
+    } finally {
+      setManualSubmitting(false);
     }
-
-    setLoading(false);
   };
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-lg px-5 py-6">
-        <section className="glass-hero mb-6 rounded-[2rem] p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <Upload size={18} className="text-primary" />
+      <div className="mx-auto max-w-5xl px-5 py-6">
+        <section className="glass-hero mb-6 rounded-[2rem] p-5 sm:p-6">
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-primary">
+            <Radio size={16} />
+            <span>Live discovery mode</span>
+          </div>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-2xl">
+              <p className="editorial-label mb-2">Browse Today&apos;s News</p>
+              <h1 className="text-safe-title text-3xl font-bold tracking-tight sm:text-4xl">
+                Find current stories to learn from
+              </h1>
+              <p className="text-safe-body mt-3 text-sm text-muted sm:text-base">
+                Browse fresh English headlines inside WordReader, preview the story,
+                and open the ones you want to study without leaving the app.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:w-auto sm:grid-cols-4">
+              {NEWS_SECTIONS.map((section) => (
+                <div key={section.id} className="glass-panel rounded-[1.35rem] px-3 py-3">
+                  <p className="editorial-label">{section.label}</p>
+                  <p className="text-safe-meta mt-2 text-xs text-muted">
+                    {section.description}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="mb-6">
+          <div className="mb-3 flex items-center justify-between gap-3">
             <div>
-              <p className="editorial-label mb-1">Import A Story</p>
-              <h1 className="text-safe-title text-xl font-bold">Read an article</h1>
+              <p className="editorial-label mb-1">Top Stories</p>
+              <h2 className="text-safe-title text-xl font-semibold">Start with what&apos;s happening now</h2>
+            </div>
+            <span className="text-safe-meta text-xs text-muted">
+              {newsLoading ? "Refreshing..." : `${topStories.length} live picks`}
+            </span>
+          </div>
+
+          {newsLoading ? (
+            <div className="glass-panel rounded-[2rem] p-6">
+              <div className="flex items-center gap-2 text-sm text-muted">
+                <Loader2 size={18} className="animate-spin" />
+                Loading live headlines...
+              </div>
+            </div>
+          ) : newsError ? (
+            <div className="glass-panel rounded-[2rem] p-6">
+              <p className="text-safe-body text-sm text-muted">{newsError}</p>
+            </div>
+          ) : !featuredStory ? (
+            <div className="glass-panel rounded-[2rem] p-6">
               <p className="text-safe-body text-sm text-muted">
-                Bring in a URL or paste text you want to study.
+                Live headlines are unavailable right now. You can still import a URL below.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-[1.3fr,0.9fr]">
+              <button
+                type="button"
+                onClick={() => setSelectedNewsItem(featuredStory)}
+                className="glass-panel rounded-[2rem] p-5 text-left transition hover:-translate-y-0.5"
+              >
+                <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-muted">
+                  <span className="glass-chip rounded-full px-3 py-1 text-primary">
+                    {featuredStory.source_name}
+                  </span>
+                  <span>{formatRelativeTime(featuredStory.published_at)}</span>
+                </div>
+                <h3 className="text-safe-title text-2xl font-semibold">
+                  {featuredStory.title}
+                </h3>
+                <p className="text-safe-body mt-3 text-sm text-muted">
+                  {featuredStory.description}
+                </p>
+                <div className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-primary">
+                  Open preview
+                  <ArrowRight size={16} />
+                </div>
+              </button>
+
+              <div className="grid gap-3">
+                {topStories.slice(1).map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setSelectedNewsItem(item)}
+                    className="glass-panel rounded-[1.6rem] p-4 text-left transition hover:-translate-y-0.5"
+                  >
+                    <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted">
+                      <span className="glass-chip rounded-full px-3 py-1 text-primary">
+                        {item.source_name}
+                      </span>
+                      <span>{formatRelativeTime(item.published_at)}</span>
+                    </div>
+                    <h3 className="text-safe-title line-clamp-3 font-semibold">{item.title}</h3>
+                    <p className="text-safe-body mt-2 line-clamp-3 text-sm text-muted">
+                      {item.description}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {warnings.length > 0 && (
+            <div className="mt-3 rounded-xl bg-warning/10 px-4 py-3 text-sm text-warning">
+              {warnings[0]}
+            </div>
+          )}
+        </section>
+
+        <section className="mb-6 grid gap-4 lg:grid-cols-2">
+          {NEWS_SECTIONS.map((section) => {
+            const sectionItems = newsItems
+              .filter((item) => item.category === section.id)
+              .slice(0, 4);
+
+            return (
+              <div key={section.id} className="glass-panel rounded-[1.9rem] p-5">
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="editorial-label mb-1">{section.label}</p>
+                    <h2 className="text-safe-title text-lg font-semibold">
+                      {section.description}
+                    </h2>
+                  </div>
+                  <span className="glass-chip rounded-full px-3 py-1 text-xs text-muted">
+                    {sectionItems.length} picks
+                  </span>
+                </div>
+
+                {sectionItems.length === 0 ? (
+                  <p className="text-safe-body text-sm text-muted">
+                    This section will refill as soon as fresh stories are available.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {sectionItems.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setSelectedNewsItem(item)}
+                        className="w-full rounded-[1.4rem] border border-border/60 bg-white/60 px-4 py-4 text-left shadow-[0_12px_30px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 dark:bg-white/4"
+                      >
+                        <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted">
+                          <span className="glass-chip rounded-full px-3 py-1 text-primary">
+                            {item.source_name}
+                          </span>
+                          <span>{formatRelativeTime(item.published_at)}</span>
+                        </div>
+                        <h3 className="text-safe-title line-clamp-2 font-semibold">{item.title}</h3>
+                        <p className="text-safe-body mt-2 line-clamp-2 text-sm text-muted">
+                          {item.description}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </section>
+
+        <section className="glass-panel mb-6 rounded-[2rem] p-5">
+          <div className="mb-4 flex items-start gap-3">
+            <div className="glass-chip flex h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] text-primary">
+              <Upload size={22} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="editorial-label mb-1">Bring Your Own Article</p>
+              <h2 className="text-safe-title text-xl font-semibold">Import by URL or pasted text</h2>
+              <p className="text-safe-body mt-2 text-sm text-muted">
+                If you already have a specific article in mind, import it here and open it straight in the reader.
               </p>
             </div>
           </div>
@@ -276,7 +380,7 @@ export default function ReadPage() {
             >
               <span className="inline-flex items-center gap-2">
                 <Globe size={14} />
-                URL import
+                Paste URL
               </span>
             </button>
             <button
@@ -301,20 +405,20 @@ export default function ReadPage() {
                 type="url"
                 value={url}
                 onChange={(event) => setUrl(event.target.value)}
-                placeholder="https://edition.cnn.com/2026/..."
+                placeholder="https://example.com/article"
                 required
-                disabled={loading}
+                disabled={isBusy}
                 className="glass-input w-full rounded-xl px-4 py-3.5 text-[16px] text-foreground outline-none transition focus:ring-2 focus:ring-primary/40"
               />
               <button
                 type="submit"
-                disabled={loading || !url.trim()}
+                disabled={isBusy || !url.trim()}
                 className="glow-button flex w-full items-center justify-center gap-2 rounded-xl py-3.5 font-medium text-primary-foreground transition hover:opacity-95 disabled:opacity-50"
               >
-                {loading ? (
+                {importing ? (
                   <>
                     <Loader2 size={18} className="animate-spin" />
-                    Extracting article...
+                    Opening article...
                   </>
                 ) : (
                   <>
@@ -332,7 +436,7 @@ export default function ReadPage() {
                 onChange={(event) => setManualTitle(event.target.value)}
                 placeholder="Article title"
                 required
-                disabled={loading}
+                disabled={isBusy}
                 className="glass-input w-full rounded-xl px-4 py-3 text-[16px] outline-none transition focus:ring-2 focus:ring-primary/40"
               />
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -341,7 +445,7 @@ export default function ReadPage() {
                   value={manualSource}
                   onChange={(event) => setManualSource(event.target.value)}
                   placeholder="Source name"
-                  disabled={loading}
+                  disabled={isBusy}
                   className="glass-input w-full rounded-xl px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary/40"
                 />
                 <input
@@ -349,7 +453,7 @@ export default function ReadPage() {
                   value={manualUrl}
                   onChange={(event) => setManualUrl(event.target.value)}
                   placeholder="Original URL (optional)"
-                  disabled={loading}
+                  disabled={isBusy}
                   className="glass-input w-full rounded-xl px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary/40"
                 />
               </div>
@@ -358,18 +462,18 @@ export default function ReadPage() {
                 onChange={(event) => setManualText(event.target.value)}
                 placeholder="Paste the article text here. Leave blank lines between paragraphs if possible."
                 required
-                disabled={loading}
+                disabled={isBusy}
                 className="glass-input min-h-40 w-full rounded-xl px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary/40"
               />
               <button
                 type="submit"
-                disabled={loading || !manualTitle.trim() || !manualText.trim()}
+                disabled={isBusy || !manualTitle.trim() || !manualText.trim()}
                 className="glow-button flex w-full items-center justify-center gap-2 rounded-xl py-3.5 font-medium text-primary-foreground transition hover:opacity-95 disabled:opacity-50"
               >
-                {loading ? (
+                {manualSubmitting ? (
                   <>
                     <Loader2 size={18} className="animate-spin" />
-                    Importing text...
+                    Creating reader copy...
                   </>
                 ) : (
                   <>
@@ -381,10 +485,10 @@ export default function ReadPage() {
             </form>
           )}
 
-          {error && (
+          {importError && (
             <div className="mt-4 flex items-start gap-2 rounded-lg bg-danger/10 px-3 py-2.5 text-sm text-danger">
               <AlertCircle size={16} className="mt-0.5 shrink-0" />
-              <span>{error}</span>
+              <span>{importError}</span>
             </div>
           )}
         </section>
@@ -402,7 +506,7 @@ export default function ReadPage() {
             <div className="glass-panel rounded-2xl p-5 text-center">
               <p className="font-medium">No active article yet</p>
               <p className="mt-1 text-sm text-muted">
-                Imported articles will show up here so you can jump back in quickly.
+                Articles you open from the live feed will show up here for quick return visits.
               </p>
             </div>
           ) : (
@@ -466,7 +570,9 @@ export default function ReadPage() {
                   <p className="chip-truncate inline-block max-w-full text-xs uppercase tracking-wide text-primary">
                     {article.source_name}
                   </p>
-                  <p className="text-safe-title mt-1 line-clamp-2 font-semibold">{article.title}</p>
+                  <p className="text-safe-title mt-1 line-clamp-2 font-semibold">
+                    {article.title}
+                  </p>
                   <p className="text-safe-body mt-2 text-xs text-muted">
                     Opens with the full reader when you&apos;re online, and falls back to the saved copy if needed.
                   </p>
@@ -478,6 +584,18 @@ export default function ReadPage() {
             </div>
           )}
         </section>
+
+        {selectedNewsItem && (
+          <NewsPreviewSheet
+            item={selectedNewsItem}
+            loading={importing}
+            onClose={() => {
+              setSelectedNewsItem(null);
+              setError(null);
+            }}
+            onRead={() => void importFromUrl(selectedNewsItem.url)}
+          />
+        )}
       </div>
     </AppShell>
   );

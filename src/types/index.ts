@@ -137,6 +137,25 @@ export interface ExtractedArticle {
   content: string;
 }
 
+export type NewsSection = "general" | "business" | "tech" | "science";
+
+export interface NewsFeedItem {
+  id: string;
+  title: string;
+  description: string;
+  url: string;
+  source_name: string;
+  published_at: string | null;
+  image_url: string | null;
+  category: NewsSection;
+}
+
+export interface NewsFeedResponse {
+  section: NewsSection | "all";
+  items: NewsFeedItem[];
+  warnings?: string[];
+}
+
 export interface SavedVocabularyPreview {
   id: string;
   word: string;

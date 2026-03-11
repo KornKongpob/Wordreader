@@ -58,7 +58,11 @@ function createSavedVocabularyMap(items: SavedVocabularyPreview[]) {
   return new Map(items.map((item) => [toSavedWordKey(item.word), item]));
 }
 
-function highlightArticleContent(content: string, savedItems: SavedVocabularyPreview[]) {
+function highlightArticleContent(
+  content: string,
+  savedItems: SavedVocabularyPreview[],
+  activeWordKey?: string | null
+) {
   if (typeof window === "undefined" || savedItems.length === 0) {
     return content;
   }
@@ -103,9 +107,9 @@ function highlightArticleContent(content: string, savedItems: SavedVocabularyPre
       }
 
       const mark = doc.createElement("mark");
-      mark.className =
-        "rounded bg-primary/15 px-1 text-primary transition hover:bg-primary/20 cursor-pointer";
-      mark.dataset.word = toSavedWordKey(match);
+      const wordKey = toSavedWordKey(match);
+      mark.className = wordKey === activeWordKey ? "reader-saved-word is-active" : "reader-saved-word";
+      mark.dataset.word = wordKey;
       mark.textContent = match;
       fragment.append(mark);
       lastIndex = offset + match.length;
@@ -130,11 +134,13 @@ export default function ReaderView({ article }: ReaderViewProps) {
   const [savedVocabulary, setSavedVocabulary] = useState<SavedVocabularyPreview[]>([]);
   const [renderedContent, setRenderedContent] = useState(article.content);
   const [resumePosition, setResumePosition] = useState<number | null>(null);
+  const [readingProgress, setReadingProgress] = useState(0);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const [lookupRequest, setLookupRequest] = useState<LookupRequest | null>(null);
   const [savedWordPreview, setSavedWordPreview] = useState<SavedVocabularyPreview | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const notesRef = useRef<HTMLDivElement>(null);
   const userIdRef = useRef<string | null>(null);
   const latestSelectionRef = useRef<string | null>(null);
   const progressRef = useRef(0);
@@ -168,6 +174,19 @@ export default function ReaderView({ article }: ReaderViewProps) {
   }, [lookupRequest]);
 
   useEffect(() => {
+    const updateReadingProgress = () => {
+      const container = viewportRef.current;
+      if (!container) return;
+
+      const scrollableHeight = container.scrollHeight - container.clientHeight;
+      if (scrollableHeight <= 0) {
+        setReadingProgress(0);
+        return;
+      }
+
+      setReadingProgress(Math.min(100, Math.max(0, Math.round((container.scrollTop / scrollableHeight) * 100))));
+    };
+
     const loadReaderContext = async () => {
       if (!supabase) return;
 
@@ -249,9 +268,9 @@ export default function ReaderView({ article }: ReaderViewProps) {
         }
       }
 
-      if (history?.last_position && history.last_position > 120) {
-        setResumePosition(history.last_position);
-      }
+        if (history?.last_position && history.last_position > 120) {
+          setResumePosition(history.last_position);
+        }
 
       if (shouldCacheOffline) {
         saveOfflineArticle({
@@ -278,6 +297,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
     };
 
     void loadReaderContext();
+    updateReadingProgress();
   }, [
     article.author,
     article.content,
@@ -320,6 +340,12 @@ export default function ReaderView({ article }: ReaderViewProps) {
       if (!container) return;
 
       progressRef.current = container.scrollTop;
+      const scrollableHeight = container.scrollHeight - container.clientHeight;
+      setReadingProgress(
+        scrollableHeight <= 0
+          ? 0
+          : Math.min(100, Math.max(0, Math.round((container.scrollTop / scrollableHeight) * 100)))
+      );
       clearSelection();
     };
 
@@ -356,7 +382,11 @@ export default function ReaderView({ article }: ReaderViewProps) {
       const nextContent =
         deferredSavedVocabulary.length === 0
           ? article.content
-          : highlightArticleContent(article.content, deferredSavedVocabulary);
+          : highlightArticleContent(
+              article.content,
+              deferredSavedVocabulary,
+              savedWordPreview ? toSavedWordKey(savedWordPreview.word) : null
+            );
 
       startTransition(() => {
         setRenderedContent(nextContent);
@@ -364,7 +394,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
     }, 0);
 
     return () => window.clearTimeout(timeout);
-  }, [article.content, deferredSavedVocabulary]);
+  }, [article.content, deferredSavedVocabulary, savedWordPreview]);
 
   useEffect(() => {
     const container = contentRef.current;
@@ -430,6 +460,12 @@ export default function ReaderView({ article }: ReaderViewProps) {
     viewport.scrollTo({ top: resumePosition, behavior: "smooth" });
   };
 
+  const handleJumpToNotes = () => {
+    notesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const plainArticleText = article.content.replace(/<[^>]+>/g, " ");
+
   const handleWordSaved = (item: SavedVocabularyPreview) => {
     const existing = savedVocabularyMapRef.current.get(toSavedWordKey(item.word));
     const nextItems = existing
@@ -467,9 +503,15 @@ export default function ReaderView({ article }: ReaderViewProps) {
         fontSize={fontSize}
         lineSpacing={lineSpacing}
         lookupMode={lookupMode}
+        articleTitle={article.title}
+        articleSourceName={article.source_name}
+        articleText={plainArticleText}
+        articleUrl={article.url}
+        readingProgress={readingProgress}
         onFontSizeChange={handleFontSizeChange}
         onLineSpacingChange={handleLineSpacingChange}
         onLookupModeChange={handleLookupModeChange}
+        onJumpToNotes={handleJumpToNotes}
       />
 
       <div
@@ -558,11 +600,13 @@ export default function ReaderView({ article }: ReaderViewProps) {
             />
           </div>
 
-          <ArticleNotes articleId={article.id} />
+          <div ref={notesRef}>
+            <ArticleNotes articleId={article.id} />
+          </div>
           <ArticleQuiz
             articleId={article.id}
             articleTitle={article.title}
-            content={article.content.replace(/<[^>]+>/g, " ")}
+            content={plainArticleText}
           />
         </article>
       </div>

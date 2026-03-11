@@ -1,20 +1,6 @@
 import { extract, extractFromHtml } from "@extractus/article-extractor";
 import type { ExtractedArticle } from "@/types";
 
-// Validate that a URL is from CNN
-export function isCNNUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return (
-      parsed.hostname === "www.cnn.com" ||
-      parsed.hostname === "cnn.com" ||
-      parsed.hostname === "edition.cnn.com"
-    );
-  } catch {
-    return false;
-  }
-}
-
 function getFetchOptions(url: string) {
   const headers = {
     "user-agent":
@@ -58,7 +44,6 @@ async function loadArticleForExtraction(url: string) {
   return { article, finalUrl: url };
 }
 
-// Extract article content from a URL using @extractus/article-extractor
 export async function extractArticle(
   url: string
 ): Promise<ExtractedArticle | null> {

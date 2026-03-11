@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { extractArticle, isCNNUrl } from "@/lib/extractor";
+import { extractArticle } from "@/lib/extractor";
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,25 +22,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // For MVP, warn if not CNN but still try extraction
-    const isCNN = isCNNUrl(url);
-
     const article = await extractArticle(url);
 
     if (!article) {
       return NextResponse.json(
-        {
-          error: isCNN
-            ? "Could not extract this CNN article. The page might be a video-only page or use a format we can't read yet."
-            : "Could not extract this article. For best results, try a CNN article URL.",
-        },
+        { error: "Could not extract this article right now. Try another article URL." },
         { status: 422 }
       );
     }
 
     return NextResponse.json({
       article,
-      isCNN,
     });
   } catch (error) {
     console.error("Extract API error:", error);

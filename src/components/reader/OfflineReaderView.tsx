@@ -58,6 +58,11 @@ export default function OfflineReaderView({ article }: OfflineReaderViewProps) {
         fontSize={fontSize}
         lineSpacing={lineSpacing}
         lookupMode={lookupMode}
+        articleTitle={article.title}
+        articleSourceName={article.source_name}
+        articleText={article.content.replace(/<[^>]+>/g, " ")}
+        articleUrl={article.url}
+        readingProgress={0}
         onFontSizeChange={handleFontSizeChange}
         onLineSpacingChange={handleLineSpacingChange}
         onLookupModeChange={handleLookupModeChange}
