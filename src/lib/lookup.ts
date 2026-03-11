@@ -1,12 +1,17 @@
-import type { LookupMode, ReaderLookupStyle } from "@/types";
+import type { LookupIntent, LookupMode, ReaderLookupStyle } from "@/types";
+
+export const WORD_SELECTION_MAX_LENGTH = 48;
+export const SMART_SELECTION_MAX_LENGTH = 900;
 
 export interface LookupSelectionInput {
   text: string;
   sentence: string;
+  paragraph: string;
 }
 
 export interface LookupRequest extends LookupSelectionInput {
   mode: LookupMode;
+  intent: LookupIntent;
 }
 
 export function normalizeLookupStyle(value?: string | null): ReaderLookupStyle {
@@ -24,7 +29,7 @@ export function persistLookupStyle(style: ReaderLookupStyle) {
 }
 
 export function getSelectionMaxLength(style: ReaderLookupStyle) {
-  return style === "word" ? 48 : 240;
+  return style === "word" ? WORD_SELECTION_MAX_LENGTH : SMART_SELECTION_MAX_LENGTH;
 }
 
 export function normalizeLookupText(value: string) {
@@ -37,35 +42,54 @@ function countWords(value: string) {
     .filter(Boolean).length;
 }
 
+function countSentences(value: string) {
+  return normalizeLookupText(value)
+    .split(/(?<=[.!?])\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean).length;
+}
+
+export function isSelectionTooLong(text: string, style: ReaderLookupStyle) {
+  const maxLength = getSelectionMaxLength(style);
+  return normalizeLookupText(text).length > maxLength;
+}
+
 export function inferLookupMode(
-  selectionText: string,
-  sentence: string,
+  selection: LookupSelectionInput,
   style: ReaderLookupStyle
 ): LookupMode {
   if (style === "word") {
     return "vocab";
   }
 
-  const normalizedSelection = normalizeLookupText(selectionText);
-  const normalizedSentence = normalizeLookupText(sentence);
+  const normalizedText = normalizeLookupText(selection.text);
+  const normalizedSentence = normalizeLookupText(selection.sentence);
+  const normalizedParagraph = normalizeLookupText(selection.paragraph);
 
-  if (!normalizedSelection) {
+  if (!normalizedText) {
     return "vocab";
   }
 
-  if (normalizedSelection === normalizedSentence) {
-    return "sentence";
+  const selectedWordCount = countWords(normalizedText);
+  const selectedSentenceCount = countSentences(normalizedText);
+  const paragraphSentenceCount = countSentences(normalizedParagraph);
+
+  if (
+    selectedSentenceCount > 1 ||
+    normalizedText.length >= 220 ||
+    (normalizedParagraph.length > 0 &&
+      normalizedText === normalizedParagraph &&
+      paragraphSentenceCount > 1)
+  ) {
+    return "paragraph";
   }
 
-  if (/[.!?]/.test(normalizedSelection)) {
-    return "sentence";
-  }
-
-  if (normalizedSelection.length >= 60) {
-    return "sentence";
-  }
-
-  if (countWords(normalizedSelection) >= 8) {
+  if (
+    normalizedText === normalizedSentence ||
+    /[.!?]/.test(normalizedText) ||
+    normalizedText.length >= 60 ||
+    selectedWordCount >= 8
+  ) {
     return "sentence";
   }
 
@@ -76,7 +100,9 @@ export function createLookupCacheKey(articleId: string, request: LookupRequest) 
   return [
     articleId,
     request.mode,
+    request.intent,
     normalizeLookupText(request.text).toLowerCase(),
     normalizeLookupText(request.sentence),
+    normalizeLookupText(request.paragraph),
   ].join("::");
 }

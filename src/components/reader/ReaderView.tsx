@@ -2,31 +2,36 @@
 
 import Image from "next/image";
 import { startTransition, useDeferredValue, useEffect, useRef, useState } from "react";
-import { ExternalLink, BookMarked, RotateCcw } from "lucide-react";
+import { BookMarked, ExternalLink, RotateCcw } from "lucide-react";
 import ProfileBootstrap from "@/components/layout/ProfileBootstrap";
-import ReaderControls from "./ReaderControls";
-import VocabPopup from "./VocabPopup";
 import ArticleNotes from "./ArticleNotes";
 import ArticleQuiz from "./ArticleQuiz";
+import ReaderControls from "./ReaderControls";
+import SavedWordPopup from "./SavedWordPopup";
+import SelectionActionBar from "./SelectionActionBar";
+import VocabPopup from "./VocabPopup";
 import { useTextSelection } from "@/hooks/useTextSelection";
 import {
   getSelectionMaxLength,
   getStoredLookupStyle,
   inferLookupMode,
+  normalizeLookupText,
   persistLookupStyle,
   type LookupRequest,
 } from "@/lib/lookup";
 import { createClient } from "@/lib/supabase/client";
 import { getOfflineVocabulary, saveOfflineArticle } from "@/lib/offline";
 import { getUserWithProfile } from "@/lib/supabase/ensureProfile";
-import type { Article, LookupResult, ReaderLookupStyle } from "@/types";
+import type {
+  Article,
+  LookupIntent,
+  LookupResult,
+  ReaderLookupStyle,
+  SavedVocabularyPreview,
+} from "@/types";
 
 interface ReaderViewProps {
   article: Article;
-}
-
-interface SavedWordRow {
-  word: string;
 }
 
 function getStoredFontSize() {
@@ -45,13 +50,21 @@ function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function highlightArticleContent(content: string, savedWords: string[]) {
-  if (typeof window === "undefined" || savedWords.length === 0) {
+function toSavedWordKey(value: string) {
+  return normalizeLookupText(value).toLowerCase();
+}
+
+function createSavedVocabularyMap(items: SavedVocabularyPreview[]) {
+  return new Map(items.map((item) => [toSavedWordKey(item.word), item]));
+}
+
+function highlightArticleContent(content: string, savedItems: SavedVocabularyPreview[]) {
+  if (typeof window === "undefined" || savedItems.length === 0) {
     return content;
   }
 
-  const normalizedWords = [...new Set(savedWords)]
-    .map((word) => word.trim())
+  const normalizedWords = [...new Set(savedItems.map((item) => item.word))]
+    .map((word) => normalizeLookupText(word))
     .filter((word) => word.length >= 3)
     .sort((a, b) => b.length - a.length)
     .slice(0, 80);
@@ -90,7 +103,9 @@ function highlightArticleContent(content: string, savedWords: string[]) {
       }
 
       const mark = doc.createElement("mark");
-      mark.className = "rounded bg-primary/15 px-1 text-primary";
+      mark.className =
+        "rounded bg-primary/15 px-1 text-primary transition hover:bg-primary/20 cursor-pointer";
+      mark.dataset.word = toSavedWordKey(match);
       mark.textContent = match;
       fragment.append(mark);
       lastIndex = offset + match.length;
@@ -112,21 +127,34 @@ export default function ReaderView({ article }: ReaderViewProps) {
   const [fontSize, setFontSize] = useState(getStoredFontSize);
   const [lineSpacing, setLineSpacing] = useState(getStoredLineSpacing);
   const [lookupMode, setLookupMode] = useState<ReaderLookupStyle>(getStoredLookupStyle);
-  const [savedWords, setSavedWords] = useState<string[]>([]);
+  const [savedVocabulary, setSavedVocabulary] = useState<SavedVocabularyPreview[]>([]);
   const [renderedContent, setRenderedContent] = useState(article.content);
   const [resumePosition, setResumePosition] = useState<number | null>(null);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const [lookupRequest, setLookupRequest] = useState<LookupRequest | null>(null);
+  const [savedWordPreview, setSavedWordPreview] = useState<SavedVocabularyPreview | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const userIdRef = useRef<string | null>(null);
   const latestSelectionRef = useRef<string | null>(null);
   const progressRef = useRef(0);
   const lookupCacheRef = useRef<Map<string, LookupResult>>(new Map());
-  const deferredSavedWords = useDeferredValue(savedWords);
+  const savedVocabularyMapRef = useRef<Map<string, SavedVocabularyPreview>>(new Map());
+  const deferredSavedVocabulary = useDeferredValue(savedVocabulary);
 
-  const { selection, clearSelection } = useTextSelection(contentRef, {
+  const { selection, clearSelection, selectionNotice } = useTextSelection(contentRef, {
     maxLength: getSelectionMaxLength(lookupMode),
   });
+
+  const applySavedVocabulary = (items: SavedVocabularyPreview[]) => {
+    const deduped = items.filter(
+      (item, index, current) =>
+        current.findIndex((candidate) => candidate.id === item.id) === index
+    );
+
+    savedVocabularyMapRef.current = createSavedVocabularyMap(deduped);
+    setSavedVocabulary(deduped);
+  };
 
   useEffect(() => {
     if (selection?.text) {
@@ -140,36 +168,16 @@ export default function ReaderView({ article }: ReaderViewProps) {
   }, [lookupRequest]);
 
   useEffect(() => {
-    if (!selection?.text || !selection.sentence) return;
-
-    const nextLookup: LookupRequest = {
-      text: selection.text,
-      sentence: selection.sentence,
-      mode: inferLookupMode(selection.text, selection.sentence, lookupMode),
-    };
-
-    const timeout = window.setTimeout(() => {
-      setLookupRequest(nextLookup);
-      clearSelection();
-    }, 150);
-
-    return () => window.clearTimeout(timeout);
-  }, [clearSelection, lookupMode, selection]);
-
-  useEffect(() => {
     const loadReaderContext = async () => {
       if (!supabase) return;
 
       let shouldCacheOffline = true;
-      const {
-        user,
-        error: userError,
-      } = await getUserWithProfile(supabase);
+      const { user, error: userError } = await getUserWithProfile(supabase);
 
       if (!user) {
         const offlineVocabulary = getOfflineVocabulary();
         if (offlineVocabulary.items.length > 0) {
-          setSavedWords(offlineVocabulary.items.map((entry) => entry.word));
+          applySavedVocabulary(offlineVocabulary.items);
         }
         if (userError && userError !== "Please sign in again.") {
           setSyncNotice(
@@ -194,7 +202,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
       setSyncNotice(null);
       userIdRef.current = user.id;
 
-      const [{ data: settings }, { data: vocabWords }, { data: history }] =
+      const [{ data: settings }, { data: vocabItems }, { data: history }] =
         await Promise.all([
           supabase
             .from("user_settings")
@@ -203,7 +211,9 @@ export default function ReaderView({ article }: ReaderViewProps) {
             .maybeSingle(),
           supabase
             .from("vocabulary_items")
-            .select("word")
+            .select(
+              "id, word, thai_meaning, english_meaning, part_of_speech, difficulty, pronunciation, last_source_name"
+            )
             .eq("user_id", user.id),
           supabase
             .from("reading_history")
@@ -230,12 +240,12 @@ export default function ReaderView({ article }: ReaderViewProps) {
         shouldCacheOffline = false;
       }
 
-      if (vocabWords) {
-        setSavedWords((vocabWords as SavedWordRow[]).map((entry) => entry.word));
+      if (vocabItems) {
+        applySavedVocabulary(vocabItems as SavedVocabularyPreview[]);
       } else {
         const offlineVocabulary = getOfflineVocabulary();
         if (offlineVocabulary.items.length > 0) {
-          setSavedWords(offlineVocabulary.items.map((entry) => entry.word));
+          applySavedVocabulary(offlineVocabulary.items);
         }
       }
 
@@ -281,15 +291,16 @@ export default function ReaderView({ article }: ReaderViewProps) {
   ]);
 
   useEffect(() => {
-    if (!supabase) return;
+    const viewport = viewportRef.current;
+    if (!supabase || !viewport) return;
 
     const saveProgress = async () => {
       const userId = userIdRef.current;
-      if (!userId) return;
+      const container = viewportRef.current;
+      if (!userId || !container) return;
 
       const isFinished =
-        window.innerHeight + window.scrollY >=
-        document.documentElement.scrollHeight - 120;
+        container.scrollTop + container.clientHeight >= container.scrollHeight - 120;
 
       await supabase.from("reading_history").upsert(
         {
@@ -305,23 +316,27 @@ export default function ReaderView({ article }: ReaderViewProps) {
     };
 
     const handleScroll = () => {
-      progressRef.current = window.scrollY;
+      const container = viewportRef.current;
+      if (!container) return;
+
+      progressRef.current = container.scrollTop;
+      clearSelection();
     };
 
     const interval = window.setInterval(() => {
       void saveProgress();
     }, 8000);
 
-    window.addEventListener("scroll", handleScroll, { passive: true });
+    viewport.addEventListener("scroll", handleScroll, { passive: true });
     window.addEventListener("beforeunload", saveProgress);
 
     return () => {
       window.clearInterval(interval);
-      window.removeEventListener("scroll", handleScroll);
+      viewport.removeEventListener("scroll", handleScroll);
       window.removeEventListener("beforeunload", saveProgress);
       void saveProgress();
     };
-  }, [article.id, supabase]);
+  }, [article.id, clearSelection, supabase]);
 
   const persistSetting = async (values: Record<string, unknown>) => {
     const userId = userIdRef.current;
@@ -339,9 +354,9 @@ export default function ReaderView({ article }: ReaderViewProps) {
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       const nextContent =
-        deferredSavedWords.length === 0
+        deferredSavedVocabulary.length === 0
           ? article.content
-          : highlightArticleContent(article.content, deferredSavedWords);
+          : highlightArticleContent(article.content, deferredSavedVocabulary);
 
       startTransition(() => {
         setRenderedContent(nextContent);
@@ -349,7 +364,39 @@ export default function ReaderView({ article }: ReaderViewProps) {
     }, 0);
 
     return () => window.clearTimeout(timeout);
-  }, [article.content, deferredSavedWords]);
+  }, [article.content, deferredSavedVocabulary]);
+
+  useEffect(() => {
+    const container = contentRef.current;
+    if (!container) return;
+
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+
+      const mark = target.closest("mark[data-word]") as HTMLElement | null;
+      if (!mark) return;
+
+      if (window.getSelection()?.toString().trim()) {
+        return;
+      }
+
+      const wordKey = mark.dataset.word;
+      if (!wordKey) return;
+
+      const item = savedVocabularyMapRef.current.get(wordKey);
+      if (!item) return;
+
+      setSavedWordPreview(item);
+      setLookupRequest(null);
+      clearSelection();
+    };
+
+    container.addEventListener("click", handleClick);
+    return () => {
+      container.removeEventListener("click", handleClick);
+    };
+  }, [clearSelection]);
 
   const formattedDate = article.published_at
     ? new Date(article.published_at).toLocaleDateString("en-US", {
@@ -378,21 +425,43 @@ export default function ReaderView({ article }: ReaderViewProps) {
   };
 
   const handleResume = () => {
-    if (resumePosition === null) return;
-    window.scrollTo({ top: resumePosition, behavior: "smooth" });
+    const viewport = viewportRef.current;
+    if (!viewport || resumePosition === null) return;
+    viewport.scrollTo({ top: resumePosition, behavior: "smooth" });
   };
 
-  const handleWordSaved = (savedWord: string) => {
-    setSavedWords((current) => {
-      const exists = current.some(
-        (word) => word.toLowerCase() === savedWord.toLowerCase()
-      );
-      return exists ? current : [...current, savedWord];
-    });
+  const handleWordSaved = (item: SavedVocabularyPreview) => {
+    const existing = savedVocabularyMapRef.current.get(toSavedWordKey(item.word));
+    const nextItems = existing
+      ? savedVocabulary.map((current) =>
+          current.id === item.id || toSavedWordKey(current.word) === toSavedWordKey(item.word)
+            ? item
+            : current
+        )
+      : [...savedVocabulary, item];
+
+    applySavedVocabulary(nextItems);
   };
+
+  const handleLookupAction = (intent: LookupIntent) => {
+    if (!selection) return;
+
+    const mode = inferLookupMode(selection, lookupMode);
+    setSavedWordPreview(null);
+    setLookupRequest({
+      text: selection.text,
+      sentence: selection.sentence,
+      paragraph: selection.paragraph,
+      mode,
+      intent,
+    });
+    clearSelection();
+  };
+
+  const activeSelectionMode = selection ? inferLookupMode(selection, lookupMode) : null;
 
   return (
-    <div className="min-h-dvh flex flex-col">
+    <div className="h-dvh flex flex-col overflow-hidden">
       <ProfileBootstrap />
       <ReaderControls
         fontSize={fontSize}
@@ -403,94 +472,129 @@ export default function ReaderView({ article }: ReaderViewProps) {
         onLookupModeChange={handleLookupModeChange}
       />
 
-      <article className="flex-1 px-5 py-6 max-w-2xl mx-auto w-full">
-        <header className="glass-panel mb-6 rounded-[2rem] p-5">
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            {savedWords.length > 0 && (
-              <span className="glass-chip inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium text-primary">
-                <BookMarked size={12} />
-                {savedWords.length} saved words highlighted
-              </span>
-            )}
-            {resumePosition !== null && (
-              <button
-                type="button"
-                onClick={handleResume}
-                className="glass-chip inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium text-muted hover:text-foreground"
-              >
-                <RotateCcw size={12} />
-                Resume where you left off
-              </button>
-            )}
-          </div>
+      <div
+        ref={viewportRef}
+        className="min-h-0 flex-1 overflow-y-auto"
+        style={{ scrollPaddingTop: "var(--reader-toolbar-offset)" }}
+      >
+        <article className="mx-auto flex min-h-full w-full max-w-2xl flex-col px-5 py-6 pb-24">
+          <header className="glass-panel mb-6 rounded-[2rem] p-5">
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              {savedVocabulary.length > 0 && (
+                <span className="glass-chip inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium text-primary">
+                  <BookMarked size={12} />
+                  {savedVocabulary.length} saved words highlighted
+                </span>
+              )}
+              {resumePosition !== null && (
+                <button
+                  type="button"
+                  onClick={handleResume}
+                  className="glass-chip inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium text-muted hover:text-foreground"
+                >
+                  <RotateCcw size={12} />
+                  Resume where you left off
+                </button>
+              )}
+            </div>
 
-          {syncNotice && (
-            <div className="mb-4 rounded-[1.2rem] bg-warning/10 px-3 py-2 text-sm text-warning">
-              {syncNotice}
+            {syncNotice && (
+              <div className="mb-4 rounded-[1.2rem] bg-warning/10 px-3 py-2 text-sm text-warning">
+                {syncNotice}
+              </div>
+            )}
+
+            <p className="editorial-label mb-2">Reader View</p>
+            <h1
+              className="mb-3 font-bold leading-tight tracking-tight"
+              style={{ fontSize: fontSize + 6 }}
+            >
+              {article.title}
+            </h1>
+
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+              <span className="glass-chip rounded-full px-3 py-1 text-xs font-medium text-primary">
+                {article.source_name}
+              </span>
+              {article.author && <span>{article.author}</span>}
+              {formattedDate && <span>{formattedDate}</span>}
+            </div>
+
+            <a
+              href={article.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-flex items-center gap-1 text-xs text-muted transition hover:text-primary"
+            >
+              View original <ExternalLink size={12} />
+            </a>
+          </header>
+
+          {article.image_url && (
+            <div className="glass-panel mb-6 overflow-hidden rounded-[1.6rem] p-2">
+              <Image
+                src={article.image_url}
+                alt={article.title}
+                width={1200}
+                height={675}
+                sizes="(max-width: 640px) 100vw, 768px"
+                className="max-h-80 w-full rounded-[1.2rem] object-cover"
+                unoptimized
+              />
             </div>
           )}
 
-          <p className="editorial-label mb-2">Reader View</p>
-          <h1
-            className="font-bold leading-tight mb-3 tracking-tight"
-            style={{ fontSize: fontSize + 6 }}
-          >
-            {article.title}
-          </h1>
-
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
-            <span className="glass-chip rounded-full px-3 py-1 text-xs font-medium text-primary">
-              {article.source_name}
-            </span>
-            {article.author && <span>{article.author}</span>}
-            {formattedDate && <span>{formattedDate}</span>}
-          </div>
-
-          <a
-            href={article.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-muted hover:text-primary mt-2 transition"
-          >
-            View original <ExternalLink size={12} />
-          </a>
-        </header>
-
-        {article.image_url && (
-          <div className="glass-panel mb-6 overflow-hidden rounded-[1.6rem] p-2">
-            <Image
-              src={article.image_url}
-              alt={article.title}
-              width={1200}
-              height={675}
-              sizes="(max-width: 640px) 100vw, 768px"
-              className="w-full h-auto object-cover max-h-80 rounded-[1.2rem]"
-              unoptimized
+          <div className="reader-paper rounded-[2rem] px-5 py-6 sm:px-8">
+            <div
+              ref={contentRef}
+              className="article-content prose max-w-none dark:prose-invert"
+              style={{
+                fontSize: `${fontSize}px`,
+                lineHeight: lineSpacing,
+              }}
+              dangerouslySetInnerHTML={{ __html: renderedContent }}
             />
           </div>
-        )}
 
-        <div
-          className="reader-paper rounded-[2rem] px-5 py-6 sm:px-8"
-        >
-          <div
-            ref={contentRef}
-            className="article-content prose dark:prose-invert max-w-none"
-            style={{
-              fontSize: `${fontSize}px`,
-              lineHeight: lineSpacing,
-            }}
-            dangerouslySetInnerHTML={{ __html: renderedContent }}
+          <ArticleNotes articleId={article.id} />
+          <ArticleQuiz
+            articleId={article.id}
+            articleTitle={article.title}
+            content={article.content.replace(/<[^>]+>/g, " ")}
           />
-        </div>
+        </article>
+      </div>
 
-        <ArticleNotes articleId={article.id} />
-        <ArticleQuiz
-          articleId={article.id}
-          articleTitle={article.title}
-          content={article.content.replace(/<[^>]+>/g, " ")}
+      {!selection && selectionNotice && !lookupRequest && !savedWordPreview && (
+        <div className="fixed bottom-0 left-0 right-0 z-30 pb-safe">
+          <div className="mx-auto max-w-lg px-4 pb-4">
+            <div className="glass-panel rounded-xl px-4 py-3 text-sm text-warning">
+              {selectionNotice}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selection && activeSelectionMode && !lookupRequest && !savedWordPreview && (
+        <SelectionActionBar
+          text={selection.text}
+          mode={activeSelectionMode}
+          onTranslate={() => handleLookupAction("translate")}
+          onExplain={
+            activeSelectionMode === "vocab"
+              ? undefined
+              : () => handleLookupAction("explain")
+          }
+          onDismiss={clearSelection}
         />
-      </article>
+      )}
+
+      {savedWordPreview && !lookupRequest && (
+        <SavedWordPopup
+          item={savedWordPreview}
+          onClose={() => setSavedWordPreview(null)}
+        />
+      )}
 
       {lookupRequest && (
         <VocabPopup

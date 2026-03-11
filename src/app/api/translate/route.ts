@@ -3,7 +3,7 @@ import { translateSelection } from "@/lib/openai";
 
 export async function POST(request: NextRequest) {
   try {
-    const { text, sentence, articleTitle, mode } = await request.json();
+    const { text, sentence, paragraph, articleTitle, mode, intent } = await request.json();
 
     if (!text || typeof text !== "string") {
       return NextResponse.json(
@@ -19,9 +19,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (mode !== "vocab" && mode !== "sentence") {
+    if (!paragraph || typeof paragraph !== "string") {
+      return NextResponse.json(
+        { error: "Please provide the paragraph context." },
+        { status: 400 }
+      );
+    }
+
+    if (mode !== "vocab" && mode !== "sentence" && mode !== "paragraph") {
       return NextResponse.json(
         { error: "Please provide a valid lookup mode." },
+        { status: 400 }
+      );
+    }
+
+    if (intent !== "translate" && intent !== "explain") {
+      return NextResponse.json(
+        { error: "Please provide a valid lookup intent." },
+        { status: 400 }
+      );
+    }
+
+    if (mode === "vocab" && intent !== "translate") {
+      return NextResponse.json(
+        { error: "Explain is only available for sentence and paragraph lookups." },
         { status: 400 }
       );
     }
@@ -36,8 +57,10 @@ export async function POST(request: NextRequest) {
     const result = await translateSelection({
       text: text.trim(),
       sentence: sentence.trim(),
+      paragraph: paragraph.trim(),
       articleTitle: articleTitle?.trim() || "Unknown article",
       mode,
+      intent,
     });
 
     return NextResponse.json(result);

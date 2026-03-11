@@ -53,7 +53,7 @@ export default function OfflineReaderView({ article }: OfflineReaderViewProps) {
   };
 
   return (
-    <div className="min-h-dvh flex flex-col">
+    <div className="h-dvh flex flex-col overflow-hidden">
       <ReaderControls
         fontSize={fontSize}
         lineSpacing={lineSpacing}
@@ -63,81 +63,83 @@ export default function OfflineReaderView({ article }: OfflineReaderViewProps) {
         onLookupModeChange={handleLookupModeChange}
       />
 
-      <article className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 px-4 py-6 sm:px-5">
-        <div className="glass-panel rounded-[1.75rem] p-4">
-          <div className="flex items-start gap-3">
-            <div className="glass-chip rounded-[1.1rem] p-2 text-primary">
-              <CloudOff size={18} />
-            </div>
-            <div>
-              <p className="editorial-label mb-1">Offline Copy</p>
-              <p className="font-medium">Saved for focus reading</p>
-              <p className="mt-1 text-sm text-muted">
-                This saved version stays readable without a network connection.
-                Word lookup and sync features resume when you&apos;re back online.
-              </p>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <article className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-6 sm:px-5">
+          <div className="glass-panel rounded-[1.75rem] p-4">
+            <div className="flex items-start gap-3">
+              <div className="glass-chip rounded-[1.1rem] p-2 text-primary">
+                <CloudOff size={18} />
+              </div>
+              <div>
+                <p className="editorial-label mb-1">Offline Copy</p>
+                <p className="font-medium">Saved for focus reading</p>
+                <p className="mt-1 text-sm text-muted">
+                  This saved version stays readable without a network connection.
+                  Word lookup and sync features resume when you&apos;re back online.
+                </p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <header className="glass-panel rounded-[2rem] p-5 sm:p-6">
-          <p className="editorial-label mb-2">Saved Article</p>
-          <h1
-            className="max-w-3xl font-semibold leading-tight tracking-[-0.03em]"
-            style={{ fontSize: fontSize + 8 }}
-          >
-            {article.title}
-          </h1>
-
-          <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted">
-            <span className="glass-chip rounded-full px-3 py-1.5 font-medium text-primary">
-              {article.source_name}
-            </span>
-            {article.author && (
-              <span className="glass-chip rounded-full px-3 py-1.5">{article.author}</span>
-            )}
-            {formattedDate && (
-              <span className="glass-chip rounded-full px-3 py-1.5">{formattedDate}</span>
-            )}
-          </div>
-
-          {!article.url.startsWith("wordreader://") && (
-            <a
-              href={article.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="glass-chip mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-muted transition hover:text-primary"
+          <header className="glass-panel rounded-[2rem] p-5 sm:p-6">
+            <p className="editorial-label mb-2">Saved Article</p>
+            <h1
+              className="max-w-3xl font-semibold leading-tight tracking-[-0.03em]"
+              style={{ fontSize: fontSize + 8 }}
             >
-              View original <ExternalLink size={12} />
-            </a>
-          )}
-        </header>
+              {article.title}
+            </h1>
 
-        {article.image_url && (
-          <div className="glass-panel overflow-hidden rounded-[1.8rem] p-2">
-            <Image
-              src={article.image_url}
-              alt={article.title}
-              width={1200}
-              height={675}
-              sizes="(max-width: 640px) 100vw, 768px"
-              className="h-auto max-h-96 w-full rounded-[1.35rem] object-cover"
-              unoptimized
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted">
+              <span className="glass-chip rounded-full px-3 py-1.5 font-medium text-primary">
+                {article.source_name}
+              </span>
+              {article.author && (
+                <span className="glass-chip rounded-full px-3 py-1.5">{article.author}</span>
+              )}
+              {formattedDate && (
+                <span className="glass-chip rounded-full px-3 py-1.5">{formattedDate}</span>
+              )}
+            </div>
+
+            {!article.url.startsWith("wordreader://") && (
+              <a
+                href={article.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="glass-chip mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-muted transition hover:text-primary"
+              >
+                View original <ExternalLink size={12} />
+              </a>
+            )}
+          </header>
+
+          {article.image_url && (
+            <div className="glass-panel overflow-hidden rounded-[1.8rem] p-2">
+              <Image
+                src={article.image_url}
+                alt={article.title}
+                width={1200}
+                height={675}
+                sizes="(max-width: 640px) 100vw, 768px"
+                className="h-auto max-h-96 w-full rounded-[1.35rem] object-cover"
+                unoptimized
+              />
+            </div>
+          )}
+
+          <div className="reader-paper rounded-[2rem] px-5 py-6 sm:px-8 sm:py-8">
+            <div
+              className="article-content max-w-none"
+              style={{
+                fontSize: `${fontSize}px`,
+                lineHeight: lineSpacing,
+              }}
+              dangerouslySetInnerHTML={{ __html: article.content }}
             />
           </div>
-        )}
-
-        <div className="reader-paper rounded-[2rem] px-5 py-6 sm:px-8 sm:py-8">
-          <div
-            className="article-content max-w-none"
-            style={{
-              fontSize: `${fontSize}px`,
-              lineHeight: lineSpacing,
-            }}
-            dangerouslySetInnerHTML={{ __html: article.content }}
-          />
-        </div>
-      </article>
+        </article>
+      </div>
     </div>
   );
 }

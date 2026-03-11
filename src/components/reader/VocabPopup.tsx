@@ -10,7 +10,14 @@ import {
   type LookupRequest,
 } from "@/lib/lookup";
 import { getUserWithProfile } from "@/lib/supabase/ensureProfile";
-import type { LookupResult, SentenceKeyPhrase, VocabularyLookupResult } from "@/types";
+import type {
+  LookupResult,
+  ParagraphExplainResult,
+  SavedVocabularyPreview,
+  SentenceExplainResult,
+  SentenceKeyPhrase,
+  VocabularyLookupResult,
+} from "@/types";
 
 interface VocabPopupProps {
   lookup: LookupRequest;
@@ -18,7 +25,7 @@ interface VocabPopupProps {
   articleTitle: string;
   articleSourceName: string;
   cacheRef: MutableRefObject<Map<string, LookupResult>>;
-  onSaved?: (word: string) => void;
+  onSaved?: (item: SavedVocabularyPreview) => void;
   onClose: () => void;
 }
 
@@ -26,8 +33,20 @@ function isSameText(a: string, b: string) {
   return normalizeLookupText(a).toLowerCase() === normalizeLookupText(b).toLowerCase();
 }
 
-function truncateSentence(value: string) {
-  return value.length > 140 ? `${value.slice(0, 140)}...` : value;
+function truncateText(value: string, limit = 180) {
+  return value.length > limit ? `${value.slice(0, limit)}...` : value;
+}
+
+function getSheetLabel(result: LookupRequest) {
+  if (result.mode === "paragraph") {
+    return result.intent === "explain" ? "Paragraph Coach" : "Paragraph Translation";
+  }
+
+  if (result.mode === "sentence") {
+    return result.intent === "explain" ? "Sentence Coach" : "Sentence Translation";
+  }
+
+  return "Word Spotlight";
 }
 
 export default function VocabPopup({
@@ -77,8 +96,10 @@ export default function VocabPopup({
           body: JSON.stringify({
             text: activeLookup.text,
             sentence: activeLookup.sentence,
+            paragraph: activeLookup.paragraph,
             articleTitle,
             mode: activeLookup.mode,
+            intent: activeLookup.intent,
           }),
         });
 
@@ -230,7 +251,16 @@ export default function VocabPopup({
       }
 
       setSaved(true);
-      onSaved?.(normalizedWord);
+      onSaved?.({
+        id: vocabItemId,
+        word: normalizedWord,
+        thai_meaning: result.thai_meaning,
+        english_meaning: result.english_meaning,
+        part_of_speech: result.part_of_speech,
+        difficulty: result.difficulty,
+        pronunciation: normalizedWord,
+        last_source_name: articleSourceName,
+      });
     } catch (saveError) {
       console.error("Save vocabulary failed:", saveError);
       setError("Could not save. Please try again.");
@@ -244,7 +274,9 @@ export default function VocabPopup({
     setActiveLookup({
       text: phrase,
       sentence: activeLookup.sentence,
+      paragraph: activeLookup.paragraph,
       mode: "vocab",
+      intent: "translate",
     });
   };
 
@@ -305,27 +337,48 @@ export default function VocabPopup({
     </div>
   );
 
-  const renderSentenceResult = (translation: Extract<LookupResult, { type: "sentence" }>) => (
+  const renderPhraseList = (keyPhrases: SentenceKeyPhrase[]) => {
+    if (keyPhrases.length === 0) {
+      return <p className="text-sm text-muted">No standout phrases in this selection.</p>;
+    }
+
+    return (
+      <div className="space-y-2">
+        {keyPhrases.map((item) => (
+          <button
+            key={`${item.phrase}-${item.thai_meaning}`}
+            type="button"
+            onClick={() => handlePhraseLookup(item.phrase)}
+            className="glass-chip flex w-full items-start justify-between gap-3 rounded-xl px-3 py-3 text-left transition hover:text-foreground"
+          >
+            <div>
+              <p className="font-medium">{item.phrase}</p>
+              <p className="mt-1 text-sm text-muted">{item.explanation}</p>
+            </div>
+            <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+              {item.thai_meaning}
+            </span>
+          </button>
+        ))}
+      </div>
+    );
+  };
+
+  const renderSentenceExplain = (translation: SentenceExplainResult) => (
     <div className="space-y-3">
       <div className="glass-panel rounded-xl p-3">
         <p className="mb-1 text-xs text-muted">Thai translation</p>
         <p className="text-base font-medium leading-relaxed">{translation.thai_translation}</p>
       </div>
 
-      <div className="glass-panel rounded-xl p-3">
-        <p className="mb-1 text-xs text-muted">Simple English</p>
-        <p className="text-sm">{translation.simple_english}</p>
-      </div>
-
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="glass-panel rounded-xl p-3">
-          <p className="mb-1 text-xs text-muted">Grammar note</p>
-          <p className="text-sm">{translation.grammar_note}</p>
+          <p className="mb-1 text-xs text-muted">Gist</p>
+          <p className="text-sm">{translation.gist}</p>
         </div>
-
         <div className="glass-panel rounded-xl p-3">
-          <p className="mb-1 text-xs text-muted">Usage note</p>
-          <p className="text-sm">{translation.usage_note}</p>
+          <p className="mb-1 text-xs text-muted">Structure note</p>
+          <p className="text-sm">{translation.structure_note}</p>
         </div>
       </div>
 
@@ -339,35 +392,100 @@ export default function VocabPopup({
             {articleSourceName}
           </span>
         </div>
-
-        {translation.key_phrases.length === 0 ? (
-          <p className="text-sm text-muted">No standout phrases in this sentence.</p>
-        ) : (
-          <div className="space-y-2">
-            {translation.key_phrases.map((item) => (
-              <button
-                key={`${item.phrase}-${item.thai_meaning}`}
-                type="button"
-                onClick={() => handlePhraseLookup(item.phrase)}
-                className="glass-chip flex w-full items-start justify-between gap-3 rounded-xl px-3 py-3 text-left transition hover:text-foreground"
-              >
-                <div>
-                  <p className="font-medium">{item.phrase}</p>
-                  <p className="mt-1 text-sm text-muted">{item.explanation}</p>
-                </div>
-                <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-                  {item.thai_meaning}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
+        {renderPhraseList(translation.key_phrases)}
       </div>
     </div>
   );
 
-  const isSentenceSelection = activeLookup.mode === "sentence";
-  const showContextAudio = !isSameText(activeLookup.text, activeLookup.sentence);
+  const renderParagraphExplain = (translation: ParagraphExplainResult) => (
+    <div className="space-y-3">
+      <div className="glass-panel rounded-xl p-3">
+        <p className="mb-1 text-xs text-muted">Thai translation</p>
+        <p className="text-base font-medium leading-relaxed">{translation.thai_translation}</p>
+      </div>
+
+      <div className="glass-panel rounded-xl p-3">
+        <p className="mb-1 text-xs text-muted">Gist</p>
+        <p className="text-sm">{translation.gist}</p>
+      </div>
+
+      <div className="glass-panel rounded-xl p-3">
+        <p className="mb-2 text-xs text-muted">Key points</p>
+        <div className="space-y-2">
+          {translation.key_points.map((point) => (
+            <div
+              key={point}
+              className="glass-chip rounded-xl px-3 py-2 text-sm text-muted"
+            >
+              {point}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="glass-panel rounded-xl p-3">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs text-muted">Key phrases</p>
+            <p className="text-xs text-muted">Tap a phrase to inspect it like vocabulary.</p>
+          </div>
+          <span className="glass-chip rounded-full px-3 py-1 text-xs text-muted">
+            {articleSourceName}
+          </span>
+        </div>
+        {renderPhraseList(translation.key_phrases)}
+      </div>
+    </div>
+  );
+
+  const renderResult = () => {
+    if (!result) return null;
+
+    if (result.type === "vocab") {
+      return renderVocabularyResult(result);
+    }
+
+    if (result.type === "sentence" && result.intent === "translate") {
+      return (
+        <div className="space-y-3">
+          <div className="glass-panel rounded-xl p-3">
+            <p className="mb-1 text-xs text-muted">Thai translation</p>
+            <p className="text-base font-medium leading-relaxed">{result.thai_translation}</p>
+          </div>
+          <div className="glass-panel rounded-xl p-3">
+            <p className="mb-1 text-xs text-muted">Gist</p>
+            <p className="text-sm">{result.gist}</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (result.type === "sentence" && result.intent === "explain") {
+      return renderSentenceExplain(result);
+    }
+
+    if (result.type === "paragraph" && result.intent === "translate") {
+      return (
+        <div className="space-y-3">
+          <div className="glass-panel rounded-xl p-3">
+            <p className="mb-1 text-xs text-muted">Thai translation</p>
+            <p className="text-base font-medium leading-relaxed">{result.thai_translation}</p>
+          </div>
+          <div className="glass-panel rounded-xl p-3">
+            <p className="mb-1 text-xs text-muted">Gist</p>
+            <p className="text-sm">{result.gist}</p>
+          </div>
+        </div>
+      );
+    }
+
+    return renderParagraphExplain(result);
+  };
+
+  const showContextAudio =
+    activeLookup.mode === "vocab"
+      ? !isSameText(activeLookup.text, activeLookup.sentence)
+      : !isSameText(activeLookup.text, activeLookup.paragraph);
 
   return (
     <>
@@ -384,31 +502,41 @@ export default function VocabPopup({
 
           <div className="mb-4 flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <p className="editorial-label mb-2">
-                {isSentenceSelection ? "Sentence Coach" : "Word Spotlight"}
-              </p>
-              <h3
-                className={`font-bold ${
-                  isSentenceSelection ? "text-base leading-snug" : "truncate text-lg"
-                }`}
-              >
-                {activeLookup.text}
+              <p className="editorial-label mb-2">{getSheetLabel(activeLookup)}</p>
+              <h3 className="text-base font-bold leading-snug">
+                {truncateText(activeLookup.text, activeLookup.mode === "paragraph" ? 220 : 120)}
               </h3>
-              <p className="mt-1 line-clamp-3 text-sm text-muted">
-                &ldquo;...{truncateSentence(activeLookup.sentence)}&rdquo;
+              <p className="mt-1 line-clamp-4 text-sm text-muted">
+                &ldquo;...
+                {truncateText(
+                  activeLookup.mode === "paragraph"
+                    ? activeLookup.paragraph
+                    : activeLookup.sentence
+                )}
+                &rdquo;
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <SpeakButton
                   text={activeLookup.text}
-                  label={isSentenceSelection ? "Sentence audio" : "Selection audio"}
+                  label={
+                    activeLookup.mode === "vocab" ? "Selection audio" : "Read selection"
+                  }
                 />
                 {showContextAudio && (
-                  <SpeakButton text={activeLookup.sentence} label="Context audio" />
+                  <SpeakButton
+                    text={
+                      activeLookup.mode === "paragraph"
+                        ? activeLookup.paragraph
+                        : activeLookup.sentence
+                    }
+                    label="Context audio"
+                  />
                 )}
               </div>
             </div>
 
             <button
+              type="button"
               onClick={onClose}
               className="subtle-button -mr-1 rounded-xl p-1.5 text-muted transition hover:text-foreground"
             >
@@ -420,13 +548,12 @@ export default function VocabPopup({
             <div className="flex items-center justify-center gap-2 py-8 text-muted">
               <Loader2 size={20} className="animate-spin" />
               <span className="text-sm">
-                {isSentenceSelection ? "Building your sentence coach..." : "Looking this up..."}
+                {activeLookup.intent === "explain" ? "Preparing explanation..." : "Translating..."}
               </span>
             </div>
           )}
 
-          {!loading && result?.type === "vocab" && renderVocabularyResult(result)}
-          {!loading && result?.type === "sentence" && renderSentenceResult(result)}
+          {!loading && renderResult()}
 
           {error && (
             <p className="mt-3 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
@@ -437,7 +564,7 @@ export default function VocabPopup({
           {!loading && !result && !error && (
             <div className="glass-panel flex items-center justify-center gap-2 rounded-xl px-4 py-4 text-sm text-muted">
               <Sparkles size={16} />
-              Nothing came back for this selection. Try another sentence.
+              Nothing came back for this selection. Try another selection.
             </div>
           )}
         </div>

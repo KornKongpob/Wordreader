@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 interface TextSelection {
   text: string;
   sentence: string;
+  paragraph: string;
   position: { x: number; y: number };
 }
 
@@ -17,15 +18,32 @@ export function useTextSelection(
   options: UseTextSelectionOptions = {}
 ) {
   const [selection, setSelection] = useState<TextSelection | null>(null);
+  const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
   const isProcessing = useRef(false);
   const maxLength = options.maxLength ?? 100;
+  const getBlockElement = useCallback((node: Node): HTMLElement | null => {
+    const container = containerRef.current;
+    let current: Node | null = node.nodeType === Node.TEXT_NODE ? node.parentNode : node;
+
+    while (current && current !== container) {
+      if (current instanceof HTMLElement) {
+        const tag = current.tagName.toLowerCase();
+        if (["p", "li", "blockquote", "figcaption"].includes(tag) || /^h[1-6]$/.test(tag)) {
+          return current;
+        }
+      }
+      current = current.parentNode;
+    }
+
+    return null;
+  }, [containerRef]);
 
   const getSentenceFromRange = useCallback((range: Range): string => {
     const selectedText = range.toString().trim();
     if (!selectedText) return "";
 
     const container = containerRef.current;
-    let scope: Node = range.commonAncestorContainer;
+    let scope: Node = getBlockElement(range.startContainer) ?? range.commonAncestorContainer;
 
     if (scope.nodeType === Node.TEXT_NODE) {
       scope = scope.parentNode ?? scope;
@@ -72,7 +90,21 @@ export function useTextSelection(
     } catch {
       return selectedText;
     }
-  }, [containerRef]);
+  }, [containerRef, getBlockElement]);
+
+  const getParagraphFromRange = useCallback((range: Range): string => {
+    const selectedText = range.toString().trim();
+    if (!selectedText) return "";
+
+    const startBlock = getBlockElement(range.startContainer);
+    const endBlock = getBlockElement(range.endContainer);
+
+    if (startBlock && endBlock && startBlock === endBlock) {
+      return startBlock.textContent?.replace(/\s+/g, " ").trim() || selectedText;
+    }
+
+    return selectedText.replace(/\s+/g, " ").trim();
+  }, [getBlockElement]);
 
   const handleSelectionChange = useCallback(() => {
     if (isProcessing.current) return;
@@ -80,6 +112,7 @@ export function useTextSelection(
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || !sel.rangeCount) {
       setSelection(null);
+      setSelectionNotice(null);
       return;
     }
 
@@ -89,8 +122,15 @@ export function useTextSelection(
     // Ignore empty or very long selections
     if (!text || text.length > maxLength) {
       setSelection(null);
+      setSelectionNotice(
+        text.length > maxLength
+          ? `Select a shorter section (up to ${maxLength} characters).`
+          : null
+      );
       return;
     }
+
+    setSelectionNotice(null);
 
     // Only handle selections within our container
     if (containerRef.current && !containerRef.current.contains(range.commonAncestorContainer)) {
@@ -107,12 +147,14 @@ export function useTextSelection(
 
     // Get the sentence
     const sentence = getSentenceFromRange(range);
+    const paragraph = getParagraphFromRange(range);
 
-    setSelection({ text, sentence, position });
-  }, [containerRef, getSentenceFromRange, maxLength]);
+    setSelection({ text, sentence, paragraph, position });
+  }, [containerRef, getParagraphFromRange, getSentenceFromRange, maxLength]);
 
   const clearSelection = useCallback(() => {
     setSelection(null);
+    setSelectionNotice(null);
     window.getSelection()?.removeAllRanges();
   }, []);
 
@@ -135,5 +177,5 @@ export function useTextSelection(
     };
   }, [containerRef, handleSelectionChange]);
 
-  return { selection, clearSelection, isProcessing };
+  return { selection, clearSelection, isProcessing, selectionNotice };
 }

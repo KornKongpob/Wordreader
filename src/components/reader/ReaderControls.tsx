@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTheme } from "@/components/layout/ThemeProvider";
 import type { ReaderLookupStyle } from "@/types";
 import {
@@ -33,14 +33,37 @@ export default function ReaderControls({
 }: ReaderControlsProps) {
   const { resolvedTheme, setTheme } = useTheme();
   const [showPanel, setShowPanel] = useState(false);
+  const chromeRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const element = chromeRef.current;
+    if (!element || typeof window === "undefined") return;
+
+    const root = document.documentElement;
+    const updateHeight = () => {
+      root.style.setProperty("--reader-toolbar-offset", `${Math.ceil(element.offsetHeight)}px`);
+    };
+
+    updateHeight();
+
+    const observer = new ResizeObserver(() => {
+      updateHeight();
+    });
+
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [showPanel]);
 
   const toggleTheme = () => {
     setTheme(resolvedTheme === "dark" ? "light" : "dark");
   };
 
   return (
-    <>
-      <div className="reader-chrome sticky top-0 z-40 border-b soft-divider pt-safe">
+    <div ref={chromeRef} className="reader-chrome shrink-0 border-b soft-divider pt-safe">
+      <div>
         <div className="px-3 pb-3 pt-3">
           <div className="glass-nav mx-auto flex h-14 max-w-2xl items-center justify-between rounded-[1.6rem] px-4">
             <Link
@@ -81,10 +104,7 @@ export default function ReaderControls({
       </div>
 
       {showPanel && (
-        <div
-          className="reader-chrome sticky z-30 border-b soft-divider px-3 pb-3"
-          style={{ top: "var(--reader-toolbar-offset)" }}
-        >
+        <div className="px-3 pb-3">
           <div className="glass-panel mx-auto max-w-2xl rounded-[1.5rem] px-4 py-4 space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -162,6 +182,6 @@ export default function ReaderControls({
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

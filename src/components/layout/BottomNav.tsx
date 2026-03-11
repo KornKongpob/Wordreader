@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, BookOpen, Library, RotateCcw, Settings } from "lucide-react";
@@ -20,6 +20,32 @@ const DUE_COUNT_CACHE_TTL_MS = 60 * 1000;
 export default function BottomNav() {
   const pathname = usePathname();
   const [dueCount, setDueCount] = useState(0);
+  const navRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const element = navRef.current;
+    if (!element || typeof window === "undefined") return;
+
+    const root = document.documentElement;
+    const updateClearance = () => {
+      const rect = element.getBoundingClientRect();
+      const bottomOffset = Math.max(0, window.innerHeight - rect.bottom);
+      const clearance = Math.ceil(rect.height + bottomOffset + 16);
+      root.style.setProperty("--bottom-nav-clearance", `${clearance}px`);
+    };
+
+    updateClearance();
+
+    const observer = new ResizeObserver(() => {
+      updateClearance();
+    });
+
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     const loadDueCount = async () => {
@@ -78,7 +104,10 @@ export default function BottomNav() {
   }, [pathname]);
 
   return (
-    <nav className="fixed bottom-3 left-3 right-3 z-50 pb-safe sm:left-1/2 sm:right-auto sm:w-full sm:max-w-lg sm:-translate-x-1/2">
+    <nav
+      ref={navRef}
+      className="fixed bottom-3 left-3 right-3 z-50 pb-safe sm:left-1/2 sm:right-auto sm:w-full sm:max-w-lg sm:-translate-x-1/2"
+    >
       <div className="glass-nav mx-auto flex h-16 items-center justify-around rounded-[1.75rem] px-2">
         {navItems.map(({ href, label, icon: Icon }) => {
           const isActive =

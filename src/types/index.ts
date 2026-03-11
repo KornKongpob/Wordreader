@@ -81,7 +81,8 @@ export interface ReviewEvent {
 }
 
 export type ReaderLookupStyle = "word" | "phrase";
-export type LookupMode = "vocab" | "sentence";
+export type LookupMode = "vocab" | "sentence" | "paragraph";
+export type LookupIntent = "translate" | "explain";
 
 export interface UserSettings {
   id: string;
@@ -136,8 +137,20 @@ export interface ExtractedArticle {
   content: string;
 }
 
+export interface SavedVocabularyPreview {
+  id: string;
+  word: string;
+  thai_meaning: string;
+  english_meaning: string;
+  part_of_speech: string;
+  difficulty: "easy" | "medium" | "hard";
+  pronunciation?: string;
+  last_source_name?: string;
+}
+
 export interface VocabularyLookupResult {
   type: "vocab";
+  intent: "translate";
   text: string;
   thai_meaning: string;
   english_meaning: string;
@@ -153,17 +166,48 @@ export interface SentenceKeyPhrase {
   explanation: string;
 }
 
-export interface SentenceLookupResult {
+export interface SentenceTranslateResult {
   type: "sentence";
+  intent: "translate";
   text: string;
   thai_translation: string;
-  simple_english: string;
-  grammar_note: string;
-  usage_note: string;
+  gist: string;
+}
+
+export interface SentenceExplainResult {
+  type: "sentence";
+  intent: "explain";
+  text: string;
+  thai_translation: string;
+  gist: string;
+  structure_note: string;
   key_phrases: SentenceKeyPhrase[];
 }
 
-export type LookupResult = VocabularyLookupResult | SentenceLookupResult;
+export interface ParagraphTranslateResult {
+  type: "paragraph";
+  intent: "translate";
+  text: string;
+  thai_translation: string;
+  gist: string;
+}
+
+export interface ParagraphExplainResult {
+  type: "paragraph";
+  intent: "explain";
+  text: string;
+  thai_translation: string;
+  gist: string;
+  key_points: string[];
+  key_phrases: SentenceKeyPhrase[];
+}
+
+export type LookupResult =
+  | VocabularyLookupResult
+  | SentenceTranslateResult
+  | SentenceExplainResult
+  | ParagraphTranslateResult
+  | ParagraphExplainResult;
 
 export interface DashboardStats {
   dueCount: number;
