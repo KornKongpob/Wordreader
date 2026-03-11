@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { translateWord } from "@/lib/openai";
+import { translateSelection } from "@/lib/openai";
 
 export async function POST(request: NextRequest) {
   try {
-    const { word, sentence, articleTitle } = await request.json();
+    const { text, sentence, articleTitle, mode } = await request.json();
 
-    if (!word || typeof word !== "string") {
+    if (!text || typeof text !== "string") {
       return NextResponse.json(
-        { error: "Please provide a word or phrase." },
+        { error: "Please provide text to translate." },
         { status: 400 }
       );
     }
@@ -19,6 +19,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (mode !== "vocab" && mode !== "sentence") {
+      return NextResponse.json(
+        { error: "Please provide a valid lookup mode." },
+        { status: 400 }
+      );
+    }
+
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
         { error: "OpenAI API key is not configured." },
@@ -26,10 +33,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await translateWord({
-      word: word.trim(),
+    const result = await translateSelection({
+      text: text.trim(),
       sentence: sentence.trim(),
       articleTitle: articleTitle?.trim() || "Unknown article",
+      mode,
     });
 
     return NextResponse.json(result);

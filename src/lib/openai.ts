@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import type { LookupMode, LookupResult, SentenceKeyPhrase } from "@/types";
 
 function getOpenAIClient() {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -8,19 +9,17 @@ function getOpenAIClient() {
   return new OpenAI({ apiKey });
 }
 
-interface TranslationInput {
-  word: string;
+interface LookupInput {
+  text: string;
   sentence: string;
   articleTitle: string;
+  mode: LookupMode;
 }
 
-interface TranslationOutput {
-  thai_meaning: string;
-  english_meaning: string;
-  part_of_speech: string;
-  contextual_meaning: string;
-  context_explanation: string;
-  difficulty: "easy" | "medium" | "hard";
+interface RawSentenceKeyPhrase {
+  phrase?: unknown;
+  thai_meaning?: unknown;
+  explanation?: unknown;
 }
 
 interface QuizInput {
@@ -42,24 +41,39 @@ interface RawQuizQuestion {
   explanation?: unknown;
 }
 
-export async function translateWord(
-  input: TranslationInput
-): Promise<TranslationOutput> {
-  const { word, sentence, articleTitle } = input;
+export async function translateSelection(
+  input: LookupInput
+): Promise<LookupResult> {
+  const { text, sentence, articleTitle, mode } = input;
 
   const openai = getOpenAIClient();
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     temperature: 0.3,
-    max_tokens: 500,
+    max_tokens: mode === "sentence" ? 800 : 500,
     messages: [
       {
         role: "system",
-        content: `You are an English-Thai vocabulary assistant for a Thai learner reading English news articles. Given a word/phrase, its sentence context, and the article title, provide a concise vocabulary entry. Respond in JSON only, no markdown.`,
+        content:
+          mode === "sentence"
+            ? `You are an English-Thai reading coach for a Thai learner reading English news articles. Given a selected sentence, its surrounding sentence context, and the article title, explain the sentence in a concise, learner-friendly way. Respond in JSON only, no markdown.`
+            : `You are an English-Thai vocabulary assistant for a Thai learner reading English news articles. Given a word/phrase, its sentence context, and the article title, provide a concise vocabulary entry. Respond in JSON only, no markdown.`,
       },
       {
         role: "user",
-        content: `Word or phrase: "${word}"
+        content:
+          mode === "sentence"
+            ? `Selected sentence: "${text}"
+Sentence: "${sentence}"
+Article: "${articleTitle}"
+
+Return JSON with these exact keys:
+- thai_translation: Natural Thai translation of the full sentence (1-2 sentences max)
+- simple_english: Simpler English paraphrase of the sentence (1 short sentence)
+- grammar_note: Brief grammar or structure note that helps the learner decode the sentence (1 short sentence)
+- usage_note: Brief note about tone, implication, or why the sentence is phrased this way (1 short sentence)
+- key_phrases: array with 0 to 3 items, each item has phrase, thai_meaning, explanation`
+            : `Word or phrase: "${text}"
 Sentence: "${sentence}"
 Article: "${articleTitle}"
 
@@ -82,12 +96,37 @@ Return JSON with these exact keys:
 
   const parsed = JSON.parse(content);
 
+  if (mode === "sentence") {
+    const keyPhrases = Array.isArray(parsed.key_phrases)
+      ? (parsed.key_phrases as RawSentenceKeyPhrase[])
+          .map((item): SentenceKeyPhrase => ({
+            phrase: String(item.phrase || "").trim(),
+            thai_meaning: String(item.thai_meaning || "").trim(),
+            explanation: String(item.explanation || "").trim(),
+          }))
+          .filter((item) => item.phrase.length > 0)
+          .slice(0, 3)
+      : [];
+
+    return {
+      type: "sentence",
+      text,
+      thai_translation: String(parsed.thai_translation || "").trim(),
+      simple_english: String(parsed.simple_english || "").trim(),
+      grammar_note: String(parsed.grammar_note || "").trim(),
+      usage_note: String(parsed.usage_note || "").trim(),
+      key_phrases: keyPhrases,
+    };
+  }
+
   return {
-    thai_meaning: parsed.thai_meaning || "",
-    english_meaning: parsed.english_meaning || "",
-    part_of_speech: parsed.part_of_speech || "",
-    contextual_meaning: parsed.contextual_meaning || "",
-    context_explanation: parsed.context_explanation || "",
+    type: "vocab",
+    text,
+    thai_meaning: String(parsed.thai_meaning || "").trim(),
+    english_meaning: String(parsed.english_meaning || "").trim(),
+    part_of_speech: String(parsed.part_of_speech || "").trim(),
+    contextual_meaning: String(parsed.contextual_meaning || "").trim(),
+    context_explanation: String(parsed.context_explanation || "").trim(),
     difficulty: ["easy", "medium", "hard"].includes(parsed.difficulty)
       ? parsed.difficulty
       : "medium",

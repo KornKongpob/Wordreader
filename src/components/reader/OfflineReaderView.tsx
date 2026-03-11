@@ -4,7 +4,9 @@ import Image from "next/image";
 import { useState } from "react";
 import { CloudOff, ExternalLink } from "lucide-react";
 import ReaderControls from "./ReaderControls";
+import { getStoredLookupStyle, persistLookupStyle } from "@/lib/lookup";
 import type { OfflineArticleRecord } from "@/lib/offline";
+import type { ReaderLookupStyle } from "@/types";
 
 interface OfflineReaderViewProps {
   article: OfflineArticleRecord;
@@ -22,16 +24,10 @@ function getStoredLineSpacing() {
   return savedLineSpacing ? parseFloat(savedLineSpacing) : 1.6;
 }
 
-function getStoredLookupMode(): "word" | "phrase" {
-  if (typeof window === "undefined") return "phrase";
-  const stored = localStorage.getItem("readerLookupMode");
-  return stored === "word" || stored === "phrase" ? stored : "phrase";
-}
-
 export default function OfflineReaderView({ article }: OfflineReaderViewProps) {
   const [fontSize, setFontSize] = useState(getStoredFontSize);
   const [lineSpacing, setLineSpacing] = useState(getStoredLineSpacing);
-  const [lookupMode, setLookupMode] = useState<"word" | "phrase">(getStoredLookupMode);
+  const [lookupMode, setLookupMode] = useState<ReaderLookupStyle>(getStoredLookupStyle);
 
   const formattedDate = article.published_at
     ? new Date(article.published_at).toLocaleDateString("en-US", {
@@ -51,9 +47,9 @@ export default function OfflineReaderView({ article }: OfflineReaderViewProps) {
     localStorage.setItem("readerLineSpacing", spacing.toString());
   };
 
-  const handleLookupModeChange = (mode: "word" | "phrase") => {
+  const handleLookupModeChange = (mode: ReaderLookupStyle) => {
     setLookupMode(mode);
-    localStorage.setItem("readerLookupMode", mode);
+    persistLookupStyle(mode);
   };
 
   return (

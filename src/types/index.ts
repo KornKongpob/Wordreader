@@ -80,6 +80,9 @@ export interface ReviewEvent {
   reviewed_at: string;
 }
 
+export type ReaderLookupStyle = "word" | "phrase";
+export type LookupMode = "vocab" | "sentence";
+
 export interface UserSettings {
   id: string;
   user_id: string;
@@ -91,7 +94,7 @@ export interface UserSettings {
   reminder_hour?: number;
   onboarding_completed?: boolean;
   enable_offline?: boolean;
-  reader_mode?: "word" | "phrase";
+  reader_mode?: ReaderLookupStyle;
   updated_at: string;
 }
 
@@ -133,8 +136,9 @@ export interface ExtractedArticle {
   content: string;
 }
 
-export interface TranslationResult {
-  word: string;
+export interface VocabularyLookupResult {
+  type: "vocab";
+  text: string;
   thai_meaning: string;
   english_meaning: string;
   part_of_speech: string;
@@ -142,6 +146,24 @@ export interface TranslationResult {
   context_explanation: string;
   difficulty: "easy" | "medium" | "hard";
 }
+
+export interface SentenceKeyPhrase {
+  phrase: string;
+  thai_meaning: string;
+  explanation: string;
+}
+
+export interface SentenceLookupResult {
+  type: "sentence";
+  text: string;
+  thai_translation: string;
+  simple_english: string;
+  grammar_note: string;
+  usage_note: string;
+  key_phrases: SentenceKeyPhrase[];
+}
+
+export type LookupResult = VocabularyLookupResult | SentenceLookupResult;
 
 export interface DashboardStats {
   dueCount: number;

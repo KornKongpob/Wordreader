@@ -9,10 +9,17 @@ import VocabPopup from "./VocabPopup";
 import ArticleNotes from "./ArticleNotes";
 import ArticleQuiz from "./ArticleQuiz";
 import { useTextSelection } from "@/hooks/useTextSelection";
+import {
+  getSelectionMaxLength,
+  getStoredLookupStyle,
+  inferLookupMode,
+  persistLookupStyle,
+  type LookupRequest,
+} from "@/lib/lookup";
 import { createClient } from "@/lib/supabase/client";
 import { getOfflineVocabulary, saveOfflineArticle } from "@/lib/offline";
 import { getUserWithProfile } from "@/lib/supabase/ensureProfile";
-import type { Article } from "@/types";
+import type { Article, LookupResult, ReaderLookupStyle } from "@/types";
 
 interface ReaderViewProps {
   article: Article;
@@ -32,12 +39,6 @@ function getStoredLineSpacing() {
   if (typeof window === "undefined") return 1.6;
   const savedLineSpacing = localStorage.getItem("readerLineSpacing");
   return savedLineSpacing ? parseFloat(savedLineSpacing) : 1.6;
-}
-
-function getStoredLookupMode(): "word" | "phrase" {
-  if (typeof window === "undefined") return "phrase";
-  const stored = localStorage.getItem("readerLookupMode");
-  return stored === "word" || stored === "phrase" ? stored : "phrase";
 }
 
 function escapeRegex(value: string) {
@@ -110,28 +111,50 @@ export default function ReaderView({ article }: ReaderViewProps) {
   const supabase = createClient();
   const [fontSize, setFontSize] = useState(getStoredFontSize);
   const [lineSpacing, setLineSpacing] = useState(getStoredLineSpacing);
-  const [lookupMode, setLookupMode] = useState<"word" | "phrase">(getStoredLookupMode);
+  const [lookupMode, setLookupMode] = useState<ReaderLookupStyle>(getStoredLookupStyle);
   const [savedWords, setSavedWords] = useState<string[]>([]);
   const [renderedContent, setRenderedContent] = useState(article.content);
   const [resumePosition, setResumePosition] = useState<number | null>(null);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
-  const [popupData, setPopupData] = useState<{
-    word: string;
-    sentence: string;
-  } | null>(null);
+  const [lookupRequest, setLookupRequest] = useState<LookupRequest | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const userIdRef = useRef<string | null>(null);
   const latestSelectionRef = useRef<string | null>(null);
   const progressRef = useRef(0);
+  const lookupCacheRef = useRef<Map<string, LookupResult>>(new Map());
   const deferredSavedWords = useDeferredValue(savedWords);
 
   const { selection, clearSelection } = useTextSelection(contentRef, {
-    maxLength: lookupMode === "phrase" ? 240 : 48,
+    maxLength: getSelectionMaxLength(lookupMode),
   });
 
   useEffect(() => {
-    latestSelectionRef.current = selection?.text || null;
+    if (selection?.text) {
+      latestSelectionRef.current = selection.text;
+    }
   }, [selection]);
+
+  useEffect(() => {
+    if (!lookupRequest) return;
+    latestSelectionRef.current = lookupRequest.text;
+  }, [lookupRequest]);
+
+  useEffect(() => {
+    if (!selection?.text || !selection.sentence) return;
+
+    const nextLookup: LookupRequest = {
+      text: selection.text,
+      sentence: selection.sentence,
+      mode: inferLookupMode(selection.text, selection.sentence, lookupMode),
+    };
+
+    const timeout = window.setTimeout(() => {
+      setLookupRequest(nextLookup);
+      clearSelection();
+    }, 150);
+
+    return () => window.clearTimeout(timeout);
+  }, [clearSelection, lookupMode, selection]);
 
   useEffect(() => {
     const loadReaderContext = async () => {
@@ -200,7 +223,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
       }
       if (settings?.reader_mode === "word" || settings?.reader_mode === "phrase") {
         setLookupMode(settings.reader_mode);
-        localStorage.setItem("readerLookupMode", settings.reader_mode);
+        persistLookupStyle(settings.reader_mode);
       }
 
       if (settings?.enable_offline === false) {
@@ -336,13 +359,6 @@ export default function ReaderView({ article }: ReaderViewProps) {
       })
     : null;
 
-  const handleOpenPopup = () => {
-    if (selection) {
-      setPopupData({ word: selection.text, sentence: selection.sentence });
-      clearSelection();
-    }
-  };
-
   const handleFontSizeChange = (size: number) => {
     setFontSize(size);
     localStorage.setItem("readerFontSize", size.toString());
@@ -355,9 +371,9 @@ export default function ReaderView({ article }: ReaderViewProps) {
     void persistSetting({ line_spacing: spacing });
   };
 
-  const handleLookupModeChange = (mode: "word" | "phrase") => {
+  const handleLookupModeChange = (mode: ReaderLookupStyle) => {
     setLookupMode(mode);
-    localStorage.setItem("readerLookupMode", mode);
+    persistLookupStyle(mode);
     void persistSetting({ reader_mode: mode });
   };
 
@@ -476,30 +492,15 @@ export default function ReaderView({ article }: ReaderViewProps) {
         />
       </article>
 
-      {selection && !popupData && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 pb-safe">
-          <div className="mx-4 mb-4 max-w-lg mx-auto">
-            <button
-              onClick={handleOpenPopup}
-              className="glow-button w-full py-3.5 rounded-2xl text-primary-foreground font-medium shadow-lg shadow-primary/25 flex items-center justify-center gap-2 active:scale-[0.98] transition"
-            >
-              {lookupMode === "word" ? "Look up" : "Explore"} &ldquo;
-              {selection.text.length > 30 ? `${selection.text.slice(0, 30)}...` : selection.text}
-              &rdquo;
-            </button>
-          </div>
-        </div>
-      )}
-
-      {popupData && (
+      {lookupRequest && (
         <VocabPopup
-          word={popupData.word}
-          sentence={popupData.sentence}
+          lookup={lookupRequest}
           articleId={article.id}
           articleTitle={article.title}
           articleSourceName={article.source_name}
+          cacheRef={lookupCacheRef}
           onSaved={handleWordSaved}
-          onClose={() => setPopupData(null)}
+          onClose={() => setLookupRequest(null)}
         />
       )}
     </div>

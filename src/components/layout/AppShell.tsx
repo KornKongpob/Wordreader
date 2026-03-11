@@ -10,7 +10,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div className="pointer-events-none absolute right-0 top-52 z-0 h-48 w-48 rounded-full bg-sky-200/20 blur-3xl dark:bg-sky-400/8" />
       <ProfileBootstrap />
       <ReviewReminderBridge />
-      <main className="relative z-10 flex-1 pb-20 pt-safe">{children}</main>
+      <main
+        className="relative z-10 flex-1 pt-safe"
+        style={{ paddingBottom: "var(--bottom-nav-clearance)" }}
+      >
+        {children}
+      </main>
       <BottomNav />
     </div>
   );

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTheme } from "@/components/layout/ThemeProvider";
+import type { ReaderLookupStyle } from "@/types";
 import {
   Sun,
   Moon,
@@ -16,10 +17,10 @@ import Link from "next/link";
 interface ReaderControlsProps {
   fontSize: number;
   lineSpacing: number;
-  lookupMode: "word" | "phrase";
+  lookupMode: ReaderLookupStyle;
   onFontSizeChange: (size: number) => void;
   onLineSpacingChange: (spacing: number) => void;
-  onLookupModeChange: (mode: "word" | "phrase") => void;
+  onLookupModeChange: (mode: ReaderLookupStyle) => void;
 }
 
 export default function ReaderControls({
@@ -39,7 +40,7 @@ export default function ReaderControls({
 
   return (
     <>
-      <div className="sticky top-0 z-40 border-b soft-divider bg-[color-mix(in_srgb,var(--color-background)_82%,transparent)] pt-safe backdrop-blur-xl">
+      <div className="reader-chrome sticky top-0 z-40 border-b soft-divider pt-safe">
         <div className="px-3 pb-3 pt-3">
           <div className="glass-nav mx-auto flex h-14 max-w-2xl items-center justify-between rounded-[1.6rem] px-4">
             <Link
@@ -80,7 +81,10 @@ export default function ReaderControls({
       </div>
 
       {showPanel && (
-        <div className="sticky top-[5.25rem] z-30 border-b soft-divider bg-[color-mix(in_srgb,var(--color-background)_82%,transparent)] px-3 pb-3 backdrop-blur-xl">
+        <div
+          className="reader-chrome sticky z-30 border-b soft-divider px-3 pb-3"
+          style={{ top: "var(--reader-toolbar-offset)" }}
+        >
           <div className="glass-panel mx-auto max-w-2xl rounded-[1.5rem] px-4 py-4 space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -138,7 +142,7 @@ export default function ReaderControls({
             </div>
 
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted">Lookup Mode</span>
+              <span className="text-sm text-muted">Lookup Style</span>
               <div className="flex items-center gap-2">
                 {(["word", "phrase"] as const).map((mode) => (
                   <button
@@ -150,7 +154,7 @@ export default function ReaderControls({
                         : "subtle-button text-muted hover:text-foreground"
                     }`}
                   >
-                    {mode === "word" ? "Single word" : "Phrase"}
+                    {mode === "word" ? "Word focus" : "Smart"}
                   </button>
                 ))}
               </div>

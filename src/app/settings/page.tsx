@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/layout/AppShell";
 import { useTheme } from "@/components/layout/ThemeProvider";
+import { getStoredLookupStyle, persistLookupStyle } from "@/lib/lookup";
 import { createClient } from "@/lib/supabase/client";
 import { getOfflineArticles } from "@/lib/offline";
 import { useRouter } from "next/navigation";
@@ -19,6 +20,7 @@ import {
   Sun,
   User,
 } from "lucide-react";
+import type { ReaderLookupStyle } from "@/types";
 
 function getStoredFontSize() {
   if (typeof window === "undefined") return 18;
@@ -32,12 +34,6 @@ function getStoredLineSpacing() {
   return savedLineSpacing ? parseFloat(savedLineSpacing) : 1.6;
 }
 
-function getStoredLookupMode(): "word" | "phrase" {
-  if (typeof window === "undefined") return "phrase";
-  const stored = localStorage.getItem("readerLookupMode");
-  return stored === "word" || stored === "phrase" ? stored : "phrase";
-}
-
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const router = useRouter();
@@ -48,7 +44,7 @@ export default function SettingsPage() {
   const [offlineCount] = useState(() => getOfflineArticles().length);
   const [defaultFontSize, setDefaultFontSize] = useState(getStoredFontSize);
   const [defaultLineSpacing, setDefaultLineSpacing] = useState(getStoredLineSpacing);
-  const [lookupMode, setLookupMode] = useState<"word" | "phrase">(getStoredLookupMode);
+  const [lookupMode, setLookupMode] = useState<ReaderLookupStyle>(getStoredLookupStyle);
   const [reviewGoal, setReviewGoal] = useState(10);
   const [enableNotifications, setEnableNotifications] = useState(false);
   const [reminderHour, setReminderHour] = useState(19);
@@ -127,7 +123,7 @@ export default function SettingsPage() {
       }
       if (settings?.reader_mode === "word" || settings?.reader_mode === "phrase") {
         setLookupMode(settings.reader_mode);
-        localStorage.setItem("readerLookupMode", settings.reader_mode);
+        persistLookupStyle(settings.reader_mode);
       }
     };
 
@@ -165,9 +161,9 @@ export default function SettingsPage() {
     void saveSettings({ line_spacing: spacing });
   };
 
-  const handleLookupModeChange = (mode: "word" | "phrase") => {
+  const handleLookupModeChange = (mode: ReaderLookupStyle) => {
     setLookupMode(mode);
-    localStorage.setItem("readerLookupMode", mode);
+    persistLookupStyle(mode);
     void saveSettings({ reader_mode: mode });
   };
 
@@ -320,7 +316,7 @@ export default function SettingsPage() {
             </div>
 
             <div className="flex items-center justify-between">
-              <span className="text-sm">Lookup mode</span>
+              <span className="text-sm">Lookup style</span>
               <div className="flex gap-2">
                 {(["word", "phrase"] as const).map((mode) => (
                   <button
@@ -333,7 +329,7 @@ export default function SettingsPage() {
                         : "subtle-button text-muted"
                     }`}
                   >
-                    {mode === "word" ? "Single word" : "Phrase"}
+                    {mode === "word" ? "Word focus" : "Smart"}
                   </button>
                 ))}
               </div>
