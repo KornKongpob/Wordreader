@@ -11,8 +11,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <ProfileBootstrap />
       <ReviewReminderBridge />
       <main
-        className="relative z-10 flex-1 pt-safe"
-        style={{ paddingBottom: "var(--bottom-nav-clearance)" }}
+        className="relative z-10 flex-1 min-h-0 pt-safe"
+        style={{ paddingBottom: "calc(var(--bottom-nav-clearance) + 0.75rem)" }}
       >
         {children}
       </main>

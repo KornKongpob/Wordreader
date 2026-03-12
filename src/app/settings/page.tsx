@@ -218,7 +218,7 @@ export default function SettingsPage() {
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-lg px-5 py-6">
+      <div className="mx-auto max-w-2xl px-5 py-6 pb-10 sm:px-6 sm:pb-12">
         <p className="editorial-label mb-2">Workspace Controls</p>
         <h1 className="mb-6 text-xl font-bold">Settings</h1>
 

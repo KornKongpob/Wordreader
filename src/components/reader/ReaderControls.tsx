@@ -102,6 +102,7 @@ export default function ReaderControls({
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const chromeRef = useRef<HTMLDivElement>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const panelMaxHeight = "calc(100dvh - env(safe-area-inset-top, 0px) - 7rem)";
 
   useEffect(() => {
     const element = chromeRef.current;
@@ -334,7 +335,10 @@ export default function ReaderControls({
 
       {showPanel && (
         <div className="px-3 pb-3">
-          <div className="glass-panel mx-auto max-w-2xl space-y-4 rounded-[1.5rem] px-4 py-4">
+          <div
+            className="glass-panel mx-auto max-w-2xl space-y-4 overflow-y-auto overscroll-contain rounded-[1.5rem] px-4 py-4"
+            style={{ maxHeight: panelMaxHeight }}
+          >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <p className="editorial-label mb-1">Reader Tools</p>

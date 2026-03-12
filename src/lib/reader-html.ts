@@ -20,6 +20,7 @@ export function sanitizeReaderHtml(content: string) {
     ADD_ATTR: [
       "data-meaning",
       "data-phrase",
+      "data-reader-ignore-selection",
       "data-type",
       "data-word",
       "data-reader-collocation",
@@ -175,6 +176,7 @@ function highlightIdiomPhrases(content: string, idioms: DetectedIdiom[]) {
         span.dataset.meaning = idiom.meaning;
         span.dataset.type = idiom.type;
         span.dataset.phrase = idiom.phrase;
+        span.dataset.readerIgnoreSelection = "true";
         span.textContent = match;
         fragment.append(span);
       } else {

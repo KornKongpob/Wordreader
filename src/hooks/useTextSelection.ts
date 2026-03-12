@@ -38,6 +38,18 @@ function normalizeBoundaryText(value: string) {
   return normalizeText(value).replace(/^[("'“”‘’\s]+|[)"'“”‘’\s.!?,;:]+$/g, "");
 }
 
+function shouldIgnoreSelectionTarget(target: EventTarget | null) {
+  if (!(target instanceof Element)) {
+    return false;
+  }
+
+  return Boolean(
+    target.closest(
+      'a, button, input, textarea, select, summary, [role="button"], [data-reader-ignore-selection="true"]'
+    )
+  );
+}
+
 function inferSelectionKind(text: string, sentence: string, paragraph: string): SelectionKind {
   const normalizedText = normalizeText(text);
   const normalizedSentence = normalizeText(sentence);
@@ -222,7 +234,13 @@ export function useTextSelection(
   }, []);
 
   useEffect(() => {
-    const handlePointerUp = () => {
+    const handlePointerUp = (event: MouseEvent | TouchEvent) => {
+      if (shouldIgnoreSelectionTarget(event.target)) {
+        setSelection(null);
+        setSelectionNotice(null);
+        return;
+      }
+
       window.setTimeout(handleSelectionChange, 10);
     };
 

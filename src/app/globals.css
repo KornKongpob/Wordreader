@@ -30,7 +30,7 @@
 }
 
 :root {
-  --bottom-nav-clearance: calc(4rem + 0.75rem + env(safe-area-inset-bottom, 0px) + 1rem);
+  --bottom-nav-clearance: calc(4.5rem + env(safe-area-inset-bottom, 0px) + 1.75rem);
   --reader-toolbar-offset: calc(5rem + env(safe-area-inset-top, 0px));
 }
 
@@ -337,6 +337,9 @@ html.standalone {
   border-radius: 0.2rem;
   cursor: pointer;
   padding: 0 0.06rem;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
   transition:
     background-color 140ms ease,
     border-color 140ms ease;

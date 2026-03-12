@@ -453,11 +453,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
     const container = contentRef.current;
     if (!container) return;
 
-    const handleClick = (event: MouseEvent) => {
-      const target = event.target;
-      if (!(target instanceof HTMLElement)) return;
-
-      const idiomHighlight = target.closest(".idiom-highlight") as HTMLElement | null;
+    const openIdiomTooltip = (idiomHighlight: HTMLElement) => {
       if (idiomHighlight) {
         const phrase = idiomHighlight.dataset.phrase || idiomHighlight.textContent || "";
         const selectedText = window.getSelection()?.toString().trim();
@@ -467,7 +463,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
         const normalizedPhrase = normalizeLookupText(phrase).toLowerCase();
 
         if (normalizedSelectedText && normalizedSelectedText !== normalizedPhrase) {
-          return;
+          window.getSelection()?.removeAllRanges();
         }
 
         const meaning = idiomHighlight.dataset.meaning || "";
@@ -488,6 +484,40 @@ export default function ReaderView({ article }: ReaderViewProps) {
         setLookupRequest(null);
         setSentenceLookup(null);
         clearSelection();
+        return true;
+      }
+
+      return false;
+    };
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+
+      const idiomHighlight = target.closest(".idiom-highlight") as HTMLElement | null;
+      if (!idiomHighlight) return;
+
+      event.preventDefault();
+      openIdiomTooltip(idiomHighlight);
+    };
+
+    const handleTouchEnd = (event: TouchEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+
+      const idiomHighlight = target.closest(".idiom-highlight") as HTMLElement | null;
+      if (!idiomHighlight) return;
+
+      event.preventDefault();
+      openIdiomTooltip(idiomHighlight);
+    };
+
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+
+      const idiomHighlight = target.closest(".idiom-highlight") as HTMLElement | null;
+      if (idiomHighlight && openIdiomTooltip(idiomHighlight)) {
         return;
       }
 
@@ -496,8 +526,14 @@ export default function ReaderView({ article }: ReaderViewProps) {
       const mark = target.closest("mark[data-word]") as HTMLElement | null;
       if (!mark) return;
 
-      if (window.getSelection()?.toString().trim()) {
-        return;
+      const selectedText = window.getSelection()?.toString().trim();
+      const normalizedSelectedText = selectedText
+        ? normalizeLookupText(selectedText).toLowerCase()
+        : "";
+      const normalizedWord = normalizeLookupText(mark.textContent || "").toLowerCase();
+
+      if (normalizedSelectedText && normalizedSelectedText !== normalizedWord) {
+        window.getSelection()?.removeAllRanges();
       }
 
       const wordKey = mark.dataset.word;
@@ -523,10 +559,14 @@ export default function ReaderView({ article }: ReaderViewProps) {
       setIdiomTooltip(null);
     };
 
+    container.addEventListener("pointerdown", handlePointerDown);
+    container.addEventListener("touchend", handleTouchEnd);
     container.addEventListener("click", handleClick);
     document.addEventListener("click", handleDocumentClick);
 
     return () => {
+      container.removeEventListener("pointerdown", handlePointerDown);
+      container.removeEventListener("touchend", handleTouchEnd);
       container.removeEventListener("click", handleClick);
       document.removeEventListener("click", handleDocumentClick);
     };

@@ -29,8 +29,11 @@ export default function BottomNav() {
     const root = document.documentElement;
     const updateClearance = () => {
       const rect = element.getBoundingClientRect();
-      const bottomOffset = Math.max(0, window.innerHeight - rect.bottom);
-      const clearance = Math.ceil(rect.height + bottomOffset + 16);
+      const viewportHeight =
+        window.visualViewport?.height ?? document.documentElement.clientHeight ?? window.innerHeight;
+      const viewportOffsetTop = window.visualViewport?.offsetTop ?? 0;
+      const bottomOffset = Math.max(0, viewportHeight + viewportOffsetTop - rect.bottom);
+      const clearance = Math.ceil(rect.height + bottomOffset + 24);
       root.style.setProperty("--bottom-nav-clearance", `${clearance}px`);
     };
 
@@ -39,11 +42,18 @@ export default function BottomNav() {
     const observer = new ResizeObserver(() => {
       updateClearance();
     });
+    const viewport = window.visualViewport;
 
     observer.observe(element);
+    window.addEventListener("resize", updateClearance);
+    viewport?.addEventListener("resize", updateClearance);
+    viewport?.addEventListener("scroll", updateClearance);
 
     return () => {
       observer.disconnect();
+      window.removeEventListener("resize", updateClearance);
+      viewport?.removeEventListener("resize", updateClearance);
+      viewport?.removeEventListener("scroll", updateClearance);
     };
   }, []);
 
@@ -106,9 +116,9 @@ export default function BottomNav() {
   return (
     <nav
       ref={navRef}
-      className="fixed bottom-3 left-3 right-3 z-50 pb-safe sm:left-1/2 sm:right-auto sm:w-full sm:max-w-lg sm:-translate-x-1/2"
+      className="pointer-events-none fixed bottom-3 left-3 right-3 z-40 pb-safe sm:left-1/2 sm:right-auto sm:w-full sm:max-w-lg sm:-translate-x-1/2"
     >
-      <div className="glass-nav mx-auto flex h-[4.25rem] items-center justify-around rounded-[1.9rem] px-2 shadow-[0_24px_48px_rgba(15,23,42,0.12)]">
+      <div className="glass-nav pointer-events-auto mx-auto flex h-[4.25rem] items-center justify-around rounded-[1.9rem] px-2 shadow-[0_24px_48px_rgba(15,23,42,0.12)]">
         {navItems.map(({ href, label, icon: Icon }) => {
           const isActive =
             href === "/" ? pathname === "/" : pathname.startsWith(href);

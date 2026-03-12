@@ -31,11 +31,11 @@ export default function NewsPreviewSheet({
   return (
     <>
       <div
-        className="fixed inset-0 z-50 bg-slate-950/32 backdrop-blur-sm"
+        className="fixed inset-0 z-[80] bg-slate-950/32 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      <div className="glass-panel-strong fixed bottom-0 left-0 right-0 z-50 max-h-[88dvh] overflow-y-auto rounded-t-[2rem] pb-safe animate-slide-up">
+      <div className="glass-panel-strong fixed bottom-0 left-0 right-0 z-[81] max-h-[88dvh] overflow-y-auto rounded-t-[2rem] pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] animate-slide-up">
         <div className="mx-auto max-w-xl px-5 pb-6 pt-4">
           <div className="mb-3 flex justify-center">
             <div className="h-1 w-10 rounded-full bg-primary/20" />
