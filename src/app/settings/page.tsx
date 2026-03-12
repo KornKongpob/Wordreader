@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/layout/AppShell";
@@ -475,10 +475,11 @@ export default function SettingsPage() {
 
         <section>
           <p className="text-safe-meta text-center text-xs text-muted">
-            WordReader v0.2.0 • Learn English from real reading sessions
+            WordReader v0.2.0 - Learn English from real reading sessions
           </p>
         </section>
       </div>
     </AppShell>
   );
 }
+

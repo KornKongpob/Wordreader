@@ -332,6 +332,36 @@ html.standalone {
     0 0 0 2px color-mix(in srgb, var(--saved-highlight-ring) 65%, transparent);
 }
 
+.article-content .idiom-highlight {
+  border-bottom: 2px dashed rgba(249, 115, 22, 0.88);
+  border-radius: 0.2rem;
+  cursor: pointer;
+  padding: 0 0.06rem;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+.article-content .idiom-highlight:hover {
+  background: rgba(249, 115, 22, 0.1);
+}
+
+.article-content [data-reader-separator="true"],
+.article-content span.text-muted\/30.px-0\.5 {
+  color: color-mix(in srgb, var(--color-muted) 34%, transparent);
+  display: inline-block;
+  font-size: 0.9em;
+  padding: 0 0.12rem;
+  user-select: none;
+}
+
+.article-content [data-reader-collocation="true"],
+.article-content span.bg-primary\/10.rounded.px-1 {
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  border-radius: 0.35rem;
+  padding: 0 0.25rem;
+}
+
 .reader-chrome {
   background:
     linear-gradient(

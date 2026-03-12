@@ -39,6 +39,8 @@ interface ReaderControlsProps {
   idiomDetectionLoading?: boolean;
   idiomCount?: number;
   idiomScanCompleted?: boolean;
+  showLookupMode?: boolean;
+  showAdvancedAiTools?: boolean;
   onFontSizeChange: (size: number) => void;
   onLineSpacingChange: (spacing: number) => void;
   onLookupModeChange: (mode: ReaderLookupStyle) => void;
@@ -84,6 +86,8 @@ export default function ReaderControls({
   idiomDetectionLoading = false,
   idiomCount = 0,
   idiomScanCompleted = false,
+  showLookupMode = true,
+  showAdvancedAiTools = true,
   onFontSizeChange,
   onLineSpacingChange,
   onLookupModeChange,
@@ -348,7 +352,11 @@ export default function ReaderControls({
               </button>
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-3">
+            <div
+              className={`grid gap-2 ${
+                onJumpToNotes ? "sm:grid-cols-3" : "sm:grid-cols-2"
+              }`}
+            >
               <button
                 type="button"
                 onClick={handleShare}
@@ -357,18 +365,19 @@ export default function ReaderControls({
                 <Share2 size={16} />
                 Share article
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onJumpToNotes?.();
-                  setPanelNotice("Jumped to notes.");
-                }}
-                disabled={!onJumpToNotes}
-                className="subtle-button inline-flex min-h-[3rem] items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-foreground disabled:opacity-50"
-              >
-                <StickyNote size={16} />
-                Jump to notes
-              </button>
+              {onJumpToNotes && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onJumpToNotes();
+                    setPanelNotice("Jumped to notes.");
+                  }}
+                  className="subtle-button inline-flex min-h-[3rem] items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-foreground"
+                >
+                  <StickyNote size={16} />
+                  Jump to notes
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleReadAloud}
@@ -445,77 +454,81 @@ export default function ReaderControls({
               </div>
             </div>
 
-            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <span className="text-safe-meta text-sm text-muted">Lookup Style</span>
-              <div className="flex flex-wrap items-center gap-2">
-                {(["word", "phrase"] as const).map((mode) => (
+            {showLookupMode && (
+              <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-safe-meta text-sm text-muted">Lookup Style</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  {(["word", "phrase"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => onLookupModeChange(mode)}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                        lookupMode === mode
+                          ? "glow-button text-primary-foreground"
+                          : "subtle-button text-muted hover:text-foreground"
+                      }`}
+                    >
+                      {mode === "word" ? "Word focus" : "Smart"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {showAdvancedAiTools && (
+              <div className="space-y-3">
+                <div className="flex flex-col items-start gap-3 rounded-2xl border border-primary/10 bg-primary/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground">Reading Helper (Chunking)</p>
+                    <p className="text-safe-meta text-xs text-muted">
+                      Adds pause bars and collocation grouping for faster scanning.
+                    </p>
+                  </div>
                   <button
-                    key={mode}
                     type="button"
-                    onClick={() => onLookupModeChange(mode)}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                      lookupMode === mode
+                    onClick={() => onReadingHelperToggle?.(!readingHelperEnabled)}
+                    disabled={!onReadingHelperToggle || readingHelperLoading}
+                    className={`inline-flex min-h-10 min-w-24 items-center justify-center rounded-full px-4 text-sm font-medium transition disabled:opacity-50 ${
+                      readingHelperEnabled
                         ? "glow-button text-primary-foreground"
                         : "subtle-button text-muted hover:text-foreground"
                     }`}
                   >
-                    {mode === "word" ? "Word focus" : "Smart"}
+                    {readingHelperLoading ? "Loading..." : readingHelperEnabled ? "On" : "Off"}
                   </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex flex-col items-start gap-3 rounded-2xl border border-primary/10 bg-primary/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-foreground">Reading Helper (Chunking)</p>
-                  <p className="text-safe-meta text-xs text-muted">
-                    Adds pause bars and collocation grouping for faster scanning.
-                  </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onReadingHelperToggle?.(!readingHelperEnabled)}
-                  disabled={!onReadingHelperToggle || readingHelperLoading}
-                  className={`inline-flex min-h-10 min-w-24 items-center justify-center rounded-full px-4 text-sm font-medium transition disabled:opacity-50 ${
-                    readingHelperEnabled
-                      ? "glow-button text-primary-foreground"
-                      : "subtle-button text-muted hover:text-foreground"
-                  }`}
-                >
-                  {readingHelperLoading ? "Loading..." : readingHelperEnabled ? "On" : "Off"}
-                </button>
-              </div>
 
-              <div className="flex flex-col items-start gap-3 rounded-2xl border border-orange-400/20 bg-orange-400/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-medium text-foreground">Detect Idioms</p>
-                    {idiomScanCompleted && (
-                      <span className="rounded-full bg-orange-400/15 px-2.5 py-1 text-xs font-medium text-orange-500">
-                        {idiomCount} found
-                      </span>
-                    )}
+                <div className="flex flex-col items-start gap-3 rounded-2xl border border-orange-400/20 bg-orange-400/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-medium text-foreground">Detect Idioms</p>
+                      {idiomScanCompleted && (
+                        <span className="rounded-full bg-orange-400/15 px-2.5 py-1 text-xs font-medium text-orange-500">
+                          {idiomCount} found
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-safe-meta text-xs text-muted">
+                      Highlight tricky idioms and phrasal verbs in the article.
+                    </p>
                   </div>
-                  <p className="text-safe-meta text-xs text-muted">
-                    Highlight tricky idioms and phrasal verbs in the article.
-                  </p>
+                  <button
+                    type="button"
+                    onClick={onDetectIdioms}
+                    disabled={!onDetectIdioms || idiomDetectionLoading}
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-orange-400/30 bg-white/70 px-4 text-sm font-medium text-orange-500 transition hover:bg-white disabled:opacity-50 dark:bg-slate-900/60 dark:hover:bg-slate-900"
+                  >
+                    <Languages size={15} />
+                    {idiomDetectionLoading
+                      ? "Scanning..."
+                      : idiomScanCompleted
+                        ? "Rescan idioms"
+                        : "Detect idioms"}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={onDetectIdioms}
-                  disabled={!onDetectIdioms || idiomDetectionLoading}
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-orange-400/30 bg-white/70 px-4 text-sm font-medium text-orange-500 transition hover:bg-white disabled:opacity-50 dark:bg-slate-900/60 dark:hover:bg-slate-900"
-                >
-                  <Languages size={15} />
-                  {idiomDetectionLoading
-                    ? "Scanning..."
-                    : idiomScanCompleted
-                      ? "Scan again"
-                      : "Detect Idioms"}
-                </button>
               </div>
-            </div>
+            )}
 
             {panelNotice && (
               <div className="rounded-xl bg-primary/8 px-3 py-2 text-sm text-primary">

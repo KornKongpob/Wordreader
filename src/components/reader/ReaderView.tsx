@@ -1,6 +1,5 @@
 "use client";
 
-import createDOMPurify from "dompurify";
 import Image from "next/image";
 import { startTransition, useDeferredValue, useEffect, useRef, useState } from "react";
 import { BookMarked, ExternalLink, Loader2, RotateCcw } from "lucide-react";
@@ -19,10 +18,15 @@ import {
   inferLookupMode,
   normalizeLookupText,
   persistLookupStyle,
-  SMART_SELECTION_MAX_LENGTH,
   type LookupRequest,
 } from "@/lib/lookup";
 import { getOfflineVocabulary, saveOfflineArticle } from "@/lib/offline";
+import {
+  buildReaderDisplayHtml,
+  getPlainTextFromHtml,
+  sanitizeReaderHtml,
+  toSavedWordKey,
+} from "@/lib/reader-html";
 import { createClient } from "@/lib/supabase/client";
 import { getUserWithProfile } from "@/lib/supabase/ensureProfile";
 import type {
@@ -63,207 +67,8 @@ function getStoredLineSpacing() {
   return savedLineSpacing ? parseFloat(savedLineSpacing) : 1.6;
 }
 
-function escapeRegex(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function toSavedWordKey(value: string) {
-  return normalizeLookupText(value).toLowerCase();
-}
-
-function toIdiomKey(value: string) {
-  return normalizeLookupText(value).toLowerCase();
-}
-
 function createSavedVocabularyMap(items: SavedVocabularyPreview[]) {
   return new Map(items.map((item) => [toSavedWordKey(item.word), item]));
-}
-
-function sanitizeReaderHtml(content: string) {
-  if (typeof window === "undefined") {
-    return content;
-  }
-
-  const DOMPurify = createDOMPurify(window);
-  return DOMPurify.sanitize(content, {
-    USE_PROFILES: { html: true },
-    ADD_ATTR: [
-      "data-meaning",
-      "data-phrase",
-      "data-type",
-      "data-word",
-      "data-reader-collocation",
-      "data-reader-separator",
-    ],
-  });
-}
-
-function highlightArticleContent(
-  content: string,
-  savedItems: SavedVocabularyPreview[],
-  activeWordKey?: string | null
-) {
-  if (typeof window === "undefined" || savedItems.length === 0) {
-    return content;
-  }
-
-  const normalizedWords = [...new Set(savedItems.map((item) => item.word))]
-    .map((word) => normalizeLookupText(word))
-    .filter((word) => word.length >= 3)
-    .sort((a, b) => b.length - a.length)
-    .slice(0, 80);
-
-  if (normalizedWords.length === 0) {
-    return content;
-  }
-
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(`<div id="reader-root">${content}</div>`, "text/html");
-  const root = doc.getElementById("reader-root");
-  if (!root) return content;
-
-  const regex = new RegExp(`(${normalizedWords.map(escapeRegex).join("|")})`, "gi");
-  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  const nodes: Text[] = [];
-
-  while (walker.nextNode()) {
-    const node = walker.currentNode as Text;
-    const parentElement = node.parentElement;
-    const parentTag = parentElement?.tagName.toLowerCase();
-
-    if (!parentTag || ["script", "style", "mark", "a"].includes(parentTag)) {
-      continue;
-    }
-
-    if (parentElement?.closest(".idiom-highlight")) {
-      continue;
-    }
-
-    if (regex.test(node.textContent || "")) {
-      nodes.push(node);
-    }
-
-    regex.lastIndex = 0;
-  }
-
-  for (const node of nodes) {
-    const text = node.textContent || "";
-    const fragment = doc.createDocumentFragment();
-    let lastIndex = 0;
-
-    text.replace(regex, (match, _capture, offset) => {
-      if (offset > lastIndex) {
-        fragment.append(doc.createTextNode(text.slice(lastIndex, offset)));
-      }
-
-      const mark = doc.createElement("mark");
-      const wordKey = toSavedWordKey(match);
-      mark.className = wordKey === activeWordKey ? "reader-saved-word is-active" : "reader-saved-word";
-      mark.dataset.word = wordKey;
-      mark.textContent = match;
-      fragment.append(mark);
-      lastIndex = offset + match.length;
-      return match;
-    });
-
-    if (lastIndex < text.length) {
-      fragment.append(doc.createTextNode(text.slice(lastIndex)));
-    }
-
-    node.parentNode?.replaceChild(fragment, node);
-  }
-
-  return root.innerHTML;
-}
-
-function highlightIdiomPhrases(content: string, idioms: DetectedIdiom[]) {
-  if (typeof window === "undefined" || idioms.length === 0) {
-    return content;
-  }
-
-  const uniqueIdioms = idioms
-    .filter(
-      (item, index, items) =>
-        items.findIndex((candidate) => toIdiomKey(candidate.phrase) === toIdiomKey(item.phrase)) === index
-    )
-    .sort((a, b) => b.phrase.length - a.phrase.length);
-
-  if (uniqueIdioms.length === 0) {
-    return content;
-  }
-
-  const idiomMap = new Map(uniqueIdioms.map((item) => [toIdiomKey(item.phrase), item]));
-  const regex = new RegExp(
-    `(${uniqueIdioms
-      .map((item) => escapeRegex(normalizeLookupText(item.phrase)).replace(/\\ /g, "\\s+"))
-      .join("|")})`,
-    "gi"
-  );
-
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(`<div id="reader-root">${content}</div>`, "text/html");
-  const root = doc.getElementById("reader-root");
-  if (!root) return content;
-
-  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  const nodes: Text[] = [];
-
-  while (walker.nextNode()) {
-    const node = walker.currentNode as Text;
-    const parentElement = node.parentElement;
-    const parentTag = parentElement?.tagName.toLowerCase();
-
-    if (!parentTag || ["script", "style", "mark", "a"].includes(parentTag)) {
-      continue;
-    }
-
-    if (parentElement?.closest(".idiom-highlight")) {
-      continue;
-    }
-
-    if (regex.test(node.textContent || "")) {
-      nodes.push(node);
-    }
-
-    regex.lastIndex = 0;
-  }
-
-  for (const node of nodes) {
-    const text = node.textContent || "";
-    const fragment = doc.createDocumentFragment();
-    let lastIndex = 0;
-
-    text.replace(regex, (match, _capture, offset) => {
-      if (offset > lastIndex) {
-        fragment.append(doc.createTextNode(text.slice(lastIndex, offset)));
-      }
-
-      const idiom = idiomMap.get(toIdiomKey(match));
-      if (idiom) {
-        const span = doc.createElement("span");
-        span.className =
-          "idiom-highlight border-b-2 border-dashed border-orange-400 cursor-pointer rounded-sm";
-        span.dataset.meaning = idiom.meaning;
-        span.dataset.type = idiom.type;
-        span.dataset.phrase = idiom.phrase;
-        span.textContent = match;
-        fragment.append(span);
-      } else {
-        fragment.append(doc.createTextNode(match));
-      }
-
-      lastIndex = offset + match.length;
-      return match;
-    });
-
-    if (lastIndex < text.length) {
-      fragment.append(doc.createTextNode(text.slice(lastIndex)));
-    }
-
-    node.parentNode?.replaceChild(fragment, node);
-  }
-
-  return root.innerHTML;
 }
 
 export default function ReaderView({ article }: ReaderViewProps) {
@@ -272,7 +77,9 @@ export default function ReaderView({ article }: ReaderViewProps) {
   const [lineSpacing, setLineSpacing] = useState(getStoredLineSpacing);
   const [lookupMode, setLookupMode] = useState<ReaderLookupStyle>(getStoredLookupStyle);
   const [savedVocabulary, setSavedVocabulary] = useState<SavedVocabularyPreview[]>([]);
-  const [renderedContent, setRenderedContent] = useState(article.content);
+  const [renderedContent, setRenderedContent] = useState(() =>
+    sanitizeReaderHtml(article.content)
+  );
   const [resumePosition, setResumePosition] = useState<number | null>(null);
   const [readingProgress, setReadingProgress] = useState(0);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
@@ -303,8 +110,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
   const idiomRequestRef = useRef<AbortController | null>(null);
   const deferredSavedVocabulary = useDeferredValue(savedVocabulary);
 
-  const selectionMaxLength =
-    lookupMode === "word" ? Math.max(getSelectionMaxLength(lookupMode), 240) : SMART_SELECTION_MAX_LENGTH;
+  const selectionMaxLength = getSelectionMaxLength(lookupMode);
 
   const { selection, clearSelection, selectionNotice } = useTextSelection(contentRef, {
     maxLength: selectionMaxLength,
@@ -341,6 +147,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
     const cachedChunkedContent = chunkedContentCacheRef.current.get(article.id) ?? null;
     const cachedIdioms = idiomCacheRef.current.get(article.id);
 
+    setRenderedContent(sanitizeReaderHtml(article.content));
     setChunkedContent(cachedChunkedContent);
     setChunkingLoading(false);
     setChunkingError(null);
@@ -352,7 +159,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
     setLookupRequest(null);
     setSentenceLookup(null);
     setSavedWordPreview(null);
-  }, [article.id]);
+  }, [article.content, article.id]);
 
   useEffect(() => {
     const updateReadingProgress = () => {
@@ -619,19 +426,12 @@ export default function ReaderView({ article }: ReaderViewProps) {
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       const sourceContent = readingHelperEnabled && chunkedContent ? chunkedContent : article.content;
-      const sanitizedContent = sanitizeReaderHtml(sourceContent);
-      const idiomEnhancedContent =
-        idiomScanCompleted && detectedIdioms.length > 0
-          ? highlightIdiomPhrases(sanitizedContent, detectedIdioms)
-          : sanitizedContent;
-      const nextContent =
-        deferredSavedVocabulary.length === 0
-          ? idiomEnhancedContent
-          : highlightArticleContent(
-              idiomEnhancedContent,
-              deferredSavedVocabulary,
-              savedWordPreview ? toSavedWordKey(savedWordPreview.word) : null
-            );
+      const nextContent = buildReaderDisplayHtml({
+        content: sourceContent,
+        savedItems: deferredSavedVocabulary,
+        activeWordKey: savedWordPreview ? toSavedWordKey(savedWordPreview.word) : null,
+        idioms: idiomScanCompleted ? detectedIdioms : [],
+      });
 
       startTransition(() => {
         setRenderedContent(nextContent);
@@ -659,16 +459,28 @@ export default function ReaderView({ article }: ReaderViewProps) {
 
       const idiomHighlight = target.closest(".idiom-highlight") as HTMLElement | null;
       if (idiomHighlight) {
-        if (window.getSelection()?.toString().trim()) {
+        const phrase = idiomHighlight.dataset.phrase || idiomHighlight.textContent || "";
+        const selectedText = window.getSelection()?.toString().trim();
+        const normalizedSelectedText = selectedText
+          ? normalizeLookupText(selectedText).toLowerCase()
+          : "";
+        const normalizedPhrase = normalizeLookupText(phrase).toLowerCase();
+
+        if (normalizedSelectedText && normalizedSelectedText !== normalizedPhrase) {
           return;
         }
 
-        const phrase = idiomHighlight.dataset.phrase || idiomHighlight.textContent || "";
         const meaning = idiomHighlight.dataset.meaning || "";
         const type = idiomHighlight.dataset.type === "phrasal_verb" ? "phrasal_verb" : "idiom";
         const rect = idiomHighlight.getBoundingClientRect();
         const placement = rect.top > 160 ? "top" : "bottom";
-        const x = Math.min(window.innerWidth - 24, Math.max(24, rect.left + rect.width / 2));
+        const viewportWidth =
+          window.visualViewport?.width || document.documentElement.clientWidth || window.innerWidth;
+        const tooltipWidth = Math.min(288, Math.max(240, viewportWidth - 32));
+        const x = Math.min(
+          viewportWidth - tooltipWidth - 16,
+          Math.max(16, rect.left + rect.width / 2 - tooltipWidth / 2)
+        );
         const y = placement === "top" ? rect.top - 14 : rect.bottom + 14;
 
         setIdiomTooltip({ phrase, meaning, type, x, y, placement });
@@ -791,7 +603,8 @@ export default function ReaderView({ article }: ReaderViewProps) {
   const handleLookupAction = (intent: LookupIntent) => {
     if (!selection) return;
 
-    if (selection.kind === "sentence") {
+    if (selection.kind === "sentence" && lookupMode !== "word") {
+      setIdiomTooltip(null);
       setSavedWordPreview(null);
       setLookupRequest(null);
       setSentenceLookup({
@@ -823,8 +636,9 @@ export default function ReaderView({ article }: ReaderViewProps) {
   };
 
   const handleDetectIdioms = async () => {
+    const forceRefresh = idiomScanCompleted;
     const cachedIdioms = idiomCacheRef.current.get(article.id);
-    if (cachedIdioms) {
+    if (!forceRefresh && cachedIdioms) {
       setDetectedIdioms(cachedIdioms);
       setIdiomScanCompleted(true);
       setIdiomError(null);
@@ -874,17 +688,23 @@ export default function ReaderView({ article }: ReaderViewProps) {
     }
   };
 
-  const plainArticleText = article.content.replace(/<[^>]+>/g, " ");
+  const plainArticleText = getPlainTextFromHtml(article.content);
   const activeSelectionMode = selection
-    ? selection.kind === "sentence"
-      ? "sentence"
-      : selection.kind === "paragraph"
-        ? "paragraph"
-        : inferLookupMode(selection, lookupMode)
+    ? lookupMode === "word"
+      ? inferLookupMode(selection, lookupMode)
+      : selection.kind === "sentence"
+        ? "sentence"
+        : selection.kind === "paragraph"
+          ? "paragraph"
+          : inferLookupMode(selection, lookupMode)
     : null;
-  const selectionPrimaryLabel = selection?.kind === "sentence" ? "Look up" : "Translate";
+  const selectionPrimaryLabel =
+    selection?.kind === "sentence" && lookupMode !== "word" ? "Look up" : "Translate";
   const showExplainAction =
-    selection && selection.kind !== "sentence" && activeSelectionMode !== null && activeSelectionMode !== "vocab";
+    selection &&
+    selection.kind !== "sentence" &&
+    activeSelectionMode !== null &&
+    activeSelectionMode !== "vocab";
 
   return (
     <div className="h-dvh flex flex-col overflow-hidden">
@@ -1065,14 +885,14 @@ export default function ReaderView({ article }: ReaderViewProps) {
       {idiomTooltip && (
         <div
           ref={tooltipRef}
-          className="pointer-events-auto fixed z-40 w-[min(18rem,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl border border-orange-400/20 bg-white/95 px-4 py-3 shadow-lg shadow-slate-950/15 dark:bg-slate-900/95"
+          className="pointer-events-auto fixed z-40 w-[min(18rem,calc(100vw-2rem))] rounded-2xl border border-orange-400/20 bg-white/95 px-4 py-3 shadow-lg shadow-slate-950/15 dark:bg-slate-900/95"
           style={{
             left: idiomTooltip.x,
             top: idiomTooltip.y,
             transform:
               idiomTooltip.placement === "top"
-                ? "translate(-50%, -100%)"
-                : "translate(-50%, 0)",
+                ? "translateY(-100%)"
+                : "none",
           }}
         >
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-orange-500">

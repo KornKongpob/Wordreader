@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -240,3 +240,5 @@ export function useTextSelection(
 
   return { selection, clearSelection, isProcessing, selectionNotice };
 }
+
+

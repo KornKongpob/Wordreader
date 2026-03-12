@@ -6,6 +6,7 @@ import { CloudOff, ExternalLink } from "lucide-react";
 import ReaderControls from "./ReaderControls";
 import { getStoredLookupStyle, persistLookupStyle } from "@/lib/lookup";
 import type { OfflineArticleRecord } from "@/lib/offline";
+import { getPlainTextFromHtml, sanitizeReaderHtml } from "@/lib/reader-html";
 import type { ReaderLookupStyle } from "@/types";
 
 interface OfflineReaderViewProps {
@@ -28,6 +29,8 @@ export default function OfflineReaderView({ article }: OfflineReaderViewProps) {
   const [fontSize, setFontSize] = useState(getStoredFontSize);
   const [lineSpacing, setLineSpacing] = useState(getStoredLineSpacing);
   const [lookupMode, setLookupMode] = useState<ReaderLookupStyle>(getStoredLookupStyle);
+  const plainArticleText = getPlainTextFromHtml(article.content);
+  const renderedContent = sanitizeReaderHtml(article.content);
 
   const formattedDate = article.published_at
     ? new Date(article.published_at).toLocaleDateString("en-US", {
@@ -60,9 +63,11 @@ export default function OfflineReaderView({ article }: OfflineReaderViewProps) {
         lookupMode={lookupMode}
         articleTitle={article.title}
         articleSourceName={article.source_name}
-        articleText={article.content.replace(/<[^>]+>/g, " ")}
+        articleText={plainArticleText}
         articleUrl={article.url}
         readingProgress={0}
+        showLookupMode={false}
+        showAdvancedAiTools={false}
         onFontSizeChange={handleFontSizeChange}
         onLineSpacingChange={handleLineSpacingChange}
         onLookupModeChange={handleLookupModeChange}
@@ -142,7 +147,7 @@ export default function OfflineReaderView({ article }: OfflineReaderViewProps) {
                 fontSize: `${fontSize}px`,
                 lineHeight: lineSpacing,
               }}
-              dangerouslySetInnerHTML={{ __html: article.content }}
+              dangerouslySetInnerHTML={{ __html: renderedContent }}
             />
           </div>
         </article>
