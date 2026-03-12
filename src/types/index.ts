@@ -1,4 +1,4 @@
-// ─── Database row types ───
+// Database row types
 
 export interface Profile {
   id: string;
@@ -83,6 +83,7 @@ export interface ReviewEvent {
 export type ReaderLookupStyle = "word" | "phrase";
 export type LookupMode = "vocab" | "sentence" | "paragraph";
 export type LookupIntent = "translate" | "explain";
+export type IdiomDetectionType = "idiom" | "phrasal_verb";
 
 export interface UserSettings {
   id: string;
@@ -124,7 +125,7 @@ export interface ArticleQuiz {
   updated_at: string;
 }
 
-// ─── API types ───
+// API and UI types
 
 export interface ExtractedArticle {
   url: string;
@@ -219,6 +220,28 @@ export interface ParagraphExplainResult {
   gist: string;
   key_points: string[];
   key_phrases: SentenceKeyPhrase[];
+}
+
+export interface SentenceAnalysisPart {
+  part: string;
+  text: string;
+}
+
+export interface SentenceAnalysisResult {
+  translation: string;
+  tense: string;
+  structure: SentenceAnalysisPart[];
+  explanation: string;
+}
+
+export interface ChunkedArticleResult {
+  html: string;
+}
+
+export interface DetectedIdiom {
+  phrase: string;
+  meaning: string;
+  type: IdiomDetectionType;
 }
 
 export type LookupResult =

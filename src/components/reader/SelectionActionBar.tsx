@@ -9,6 +9,7 @@ interface SelectionActionBarProps {
   onTranslate: () => void;
   onExplain?: () => void;
   onDismiss: () => void;
+  primaryLabel?: string;
 }
 
 function getModeLabel(mode: LookupMode) {
@@ -23,6 +24,7 @@ export default function SelectionActionBar({
   onTranslate,
   onExplain,
   onDismiss,
+  primaryLabel = "Translate",
 }: SelectionActionBarProps) {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 pb-safe">
@@ -55,7 +57,7 @@ export default function SelectionActionBar({
               className="glow-button inline-flex min-h-[3.25rem] items-center justify-center gap-2 rounded-xl px-3 py-3 text-center text-sm font-medium text-primary-foreground"
             >
               <Languages size={16} />
-              Translate
+              {primaryLabel}
             </button>
 
             {mode !== "vocab" && onExplain ? (

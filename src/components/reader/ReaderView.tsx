@@ -1,14 +1,16 @@
 "use client";
 
+import createDOMPurify from "dompurify";
 import Image from "next/image";
 import { startTransition, useDeferredValue, useEffect, useRef, useState } from "react";
-import { BookMarked, ExternalLink, RotateCcw } from "lucide-react";
+import { BookMarked, ExternalLink, Loader2, RotateCcw } from "lucide-react";
 import ProfileBootstrap from "@/components/layout/ProfileBootstrap";
 import ArticleNotes from "./ArticleNotes";
 import ArticleQuiz from "./ArticleQuiz";
 import ReaderControls from "./ReaderControls";
 import SavedWordPopup from "./SavedWordPopup";
 import SelectionActionBar from "./SelectionActionBar";
+import SentencePopup from "./SentencePopup";
 import VocabPopup from "./VocabPopup";
 import { useTextSelection } from "@/hooks/useTextSelection";
 import {
@@ -17,21 +19,36 @@ import {
   inferLookupMode,
   normalizeLookupText,
   persistLookupStyle,
+  SMART_SELECTION_MAX_LENGTH,
   type LookupRequest,
 } from "@/lib/lookup";
-import { createClient } from "@/lib/supabase/client";
 import { getOfflineVocabulary, saveOfflineArticle } from "@/lib/offline";
+import { createClient } from "@/lib/supabase/client";
 import { getUserWithProfile } from "@/lib/supabase/ensureProfile";
 import type {
   Article,
+  DetectedIdiom,
   LookupIntent,
   LookupResult,
   ReaderLookupStyle,
   SavedVocabularyPreview,
+  SentenceAnalysisResult,
 } from "@/types";
 
 interface ReaderViewProps {
   article: Article;
+}
+
+interface SentenceLookupRequest {
+  text: string;
+  sentence: string;
+  paragraph: string;
+}
+
+interface IdiomTooltipState extends DetectedIdiom {
+  x: number;
+  y: number;
+  placement: "top" | "bottom";
 }
 
 function getStoredFontSize() {
@@ -54,8 +71,31 @@ function toSavedWordKey(value: string) {
   return normalizeLookupText(value).toLowerCase();
 }
 
+function toIdiomKey(value: string) {
+  return normalizeLookupText(value).toLowerCase();
+}
+
 function createSavedVocabularyMap(items: SavedVocabularyPreview[]) {
   return new Map(items.map((item) => [toSavedWordKey(item.word), item]));
+}
+
+function sanitizeReaderHtml(content: string) {
+  if (typeof window === "undefined") {
+    return content;
+  }
+
+  const DOMPurify = createDOMPurify(window);
+  return DOMPurify.sanitize(content, {
+    USE_PROFILES: { html: true },
+    ADD_ATTR: [
+      "data-meaning",
+      "data-phrase",
+      "data-type",
+      "data-word",
+      "data-reader-collocation",
+      "data-reader-separator",
+    ],
+  });
 }
 
 function highlightArticleContent(
@@ -88,11 +128,21 @@ function highlightArticleContent(
 
   while (walker.nextNode()) {
     const node = walker.currentNode as Text;
-    const parentTag = node.parentElement?.tagName.toLowerCase();
-    if (!parentTag || ["script", "style", "mark", "a"].includes(parentTag)) continue;
+    const parentElement = node.parentElement;
+    const parentTag = parentElement?.tagName.toLowerCase();
+
+    if (!parentTag || ["script", "style", "mark", "a"].includes(parentTag)) {
+      continue;
+    }
+
+    if (parentElement?.closest(".idiom-highlight")) {
+      continue;
+    }
+
     if (regex.test(node.textContent || "")) {
       nodes.push(node);
     }
+
     regex.lastIndex = 0;
   }
 
@@ -126,6 +176,96 @@ function highlightArticleContent(
   return root.innerHTML;
 }
 
+function highlightIdiomPhrases(content: string, idioms: DetectedIdiom[]) {
+  if (typeof window === "undefined" || idioms.length === 0) {
+    return content;
+  }
+
+  const uniqueIdioms = idioms
+    .filter(
+      (item, index, items) =>
+        items.findIndex((candidate) => toIdiomKey(candidate.phrase) === toIdiomKey(item.phrase)) === index
+    )
+    .sort((a, b) => b.phrase.length - a.phrase.length);
+
+  if (uniqueIdioms.length === 0) {
+    return content;
+  }
+
+  const idiomMap = new Map(uniqueIdioms.map((item) => [toIdiomKey(item.phrase), item]));
+  const regex = new RegExp(
+    `(${uniqueIdioms
+      .map((item) => escapeRegex(normalizeLookupText(item.phrase)).replace(/\\ /g, "\\s+"))
+      .join("|")})`,
+    "gi"
+  );
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(`<div id="reader-root">${content}</div>`, "text/html");
+  const root = doc.getElementById("reader-root");
+  if (!root) return content;
+
+  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes: Text[] = [];
+
+  while (walker.nextNode()) {
+    const node = walker.currentNode as Text;
+    const parentElement = node.parentElement;
+    const parentTag = parentElement?.tagName.toLowerCase();
+
+    if (!parentTag || ["script", "style", "mark", "a"].includes(parentTag)) {
+      continue;
+    }
+
+    if (parentElement?.closest(".idiom-highlight")) {
+      continue;
+    }
+
+    if (regex.test(node.textContent || "")) {
+      nodes.push(node);
+    }
+
+    regex.lastIndex = 0;
+  }
+
+  for (const node of nodes) {
+    const text = node.textContent || "";
+    const fragment = doc.createDocumentFragment();
+    let lastIndex = 0;
+
+    text.replace(regex, (match, _capture, offset) => {
+      if (offset > lastIndex) {
+        fragment.append(doc.createTextNode(text.slice(lastIndex, offset)));
+      }
+
+      const idiom = idiomMap.get(toIdiomKey(match));
+      if (idiom) {
+        const span = doc.createElement("span");
+        span.className =
+          "idiom-highlight border-b-2 border-dashed border-orange-400 cursor-pointer rounded-sm";
+        span.dataset.meaning = idiom.meaning;
+        span.dataset.type = idiom.type;
+        span.dataset.phrase = idiom.phrase;
+        span.textContent = match;
+        fragment.append(span);
+      } else {
+        fragment.append(doc.createTextNode(match));
+      }
+
+      lastIndex = offset + match.length;
+      return match;
+    });
+
+    if (lastIndex < text.length) {
+      fragment.append(doc.createTextNode(text.slice(lastIndex)));
+    }
+
+    node.parentNode?.replaceChild(fragment, node);
+  }
+
+  return root.innerHTML;
+}
+
 export default function ReaderView({ article }: ReaderViewProps) {
   const supabase = createClient();
   const [fontSize, setFontSize] = useState(getStoredFontSize);
@@ -137,19 +277,37 @@ export default function ReaderView({ article }: ReaderViewProps) {
   const [readingProgress, setReadingProgress] = useState(0);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const [lookupRequest, setLookupRequest] = useState<LookupRequest | null>(null);
+  const [sentenceLookup, setSentenceLookup] = useState<SentenceLookupRequest | null>(null);
   const [savedWordPreview, setSavedWordPreview] = useState<SavedVocabularyPreview | null>(null);
+  const [readingHelperEnabled, setReadingHelperEnabled] = useState(false);
+  const [chunkedContent, setChunkedContent] = useState<string | null>(null);
+  const [chunkingLoading, setChunkingLoading] = useState(false);
+  const [chunkingError, setChunkingError] = useState<string | null>(null);
+  const [detectedIdioms, setDetectedIdioms] = useState<DetectedIdiom[]>([]);
+  const [idiomDetectionLoading, setIdiomDetectionLoading] = useState(false);
+  const [idiomError, setIdiomError] = useState<string | null>(null);
+  const [idiomScanCompleted, setIdiomScanCompleted] = useState(false);
+  const [idiomTooltip, setIdiomTooltip] = useState<IdiomTooltipState | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const notesRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
   const userIdRef = useRef<string | null>(null);
   const latestSelectionRef = useRef<string | null>(null);
   const progressRef = useRef(0);
   const lookupCacheRef = useRef<Map<string, LookupResult>>(new Map());
   const savedVocabularyMapRef = useRef<Map<string, SavedVocabularyPreview>>(new Map());
+  const sentenceAnalysisCacheRef = useRef<Map<string, SentenceAnalysisResult>>(new Map());
+  const chunkedContentCacheRef = useRef<Map<string, string>>(new Map());
+  const idiomCacheRef = useRef<Map<string, DetectedIdiom[]>>(new Map());
+  const idiomRequestRef = useRef<AbortController | null>(null);
   const deferredSavedVocabulary = useDeferredValue(savedVocabulary);
 
+  const selectionMaxLength =
+    lookupMode === "word" ? Math.max(getSelectionMaxLength(lookupMode), 240) : SMART_SELECTION_MAX_LENGTH;
+
   const { selection, clearSelection, selectionNotice } = useTextSelection(contentRef, {
-    maxLength: getSelectionMaxLength(lookupMode),
+    maxLength: selectionMaxLength,
   });
 
   const applySavedVocabulary = (items: SavedVocabularyPreview[]) => {
@@ -165,6 +323,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
   useEffect(() => {
     if (selection?.text) {
       latestSelectionRef.current = selection.text;
+      setIdiomTooltip(null);
     }
   }, [selection]);
 
@@ -172,6 +331,28 @@ export default function ReaderView({ article }: ReaderViewProps) {
     if (!lookupRequest) return;
     latestSelectionRef.current = lookupRequest.text;
   }, [lookupRequest]);
+
+  useEffect(() => {
+    if (!sentenceLookup) return;
+    latestSelectionRef.current = sentenceLookup.sentence;
+  }, [sentenceLookup]);
+
+  useEffect(() => {
+    const cachedChunkedContent = chunkedContentCacheRef.current.get(article.id) ?? null;
+    const cachedIdioms = idiomCacheRef.current.get(article.id);
+
+    setChunkedContent(cachedChunkedContent);
+    setChunkingLoading(false);
+    setChunkingError(null);
+    setDetectedIdioms(cachedIdioms ?? []);
+    setIdiomScanCompleted(cachedIdioms !== undefined);
+    setIdiomDetectionLoading(false);
+    setIdiomError(null);
+    setIdiomTooltip(null);
+    setLookupRequest(null);
+    setSentenceLookup(null);
+    setSavedWordPreview(null);
+  }, [article.id]);
 
   useEffect(() => {
     const updateReadingProgress = () => {
@@ -184,7 +365,9 @@ export default function ReaderView({ article }: ReaderViewProps) {
         return;
       }
 
-      setReadingProgress(Math.min(100, Math.max(0, Math.round((container.scrollTop / scrollableHeight) * 100))));
+      setReadingProgress(
+        Math.min(100, Math.max(0, Math.round((container.scrollTop / scrollableHeight) * 100)))
+      );
     };
 
     const loadReaderContext = async () => {
@@ -198,11 +381,13 @@ export default function ReaderView({ article }: ReaderViewProps) {
         if (offlineVocabulary.items.length > 0) {
           applySavedVocabulary(offlineVocabulary.items);
         }
+
         if (userError && userError !== "Please sign in again.") {
           setSyncNotice(
             "Cloud sync is unavailable right now. Reading still works, but notes and vocabulary saves may fail."
           );
         }
+
         if (shouldCacheOffline) {
           saveOfflineArticle({
             id: article.id,
@@ -215,41 +400,43 @@ export default function ReaderView({ article }: ReaderViewProps) {
             content: article.content,
           });
         }
+
         return;
       }
 
       setSyncNotice(null);
       userIdRef.current = user.id;
 
-      const [{ data: settings }, { data: vocabItems }, { data: history }] =
-        await Promise.all([
-          supabase
-            .from("user_settings")
-            .select("font_size, line_spacing, reader_mode, enable_offline")
-            .eq("user_id", user.id)
-            .maybeSingle(),
-          supabase
-            .from("vocabulary_items")
-            .select(
-              "id, word, thai_meaning, english_meaning, part_of_speech, difficulty, pronunciation, last_source_name"
-            )
-            .eq("user_id", user.id),
-          supabase
-            .from("reading_history")
-            .select("last_position")
-            .eq("user_id", user.id)
-            .eq("article_id", article.id)
-            .maybeSingle(),
-        ]);
+      const [{ data: settings }, { data: vocabItems }, { data: history }] = await Promise.all([
+        supabase
+          .from("user_settings")
+          .select("font_size, line_spacing, reader_mode, enable_offline")
+          .eq("user_id", user.id)
+          .maybeSingle(),
+        supabase
+          .from("vocabulary_items")
+          .select(
+            "id, word, thai_meaning, english_meaning, part_of_speech, difficulty, pronunciation, last_source_name"
+          )
+          .eq("user_id", user.id),
+        supabase
+          .from("reading_history")
+          .select("last_position")
+          .eq("user_id", user.id)
+          .eq("article_id", article.id)
+          .maybeSingle(),
+      ]);
 
       if (settings?.font_size) {
         setFontSize(settings.font_size);
         localStorage.setItem("readerFontSize", settings.font_size.toString());
       }
+
       if (settings?.line_spacing) {
         setLineSpacing(settings.line_spacing);
         localStorage.setItem("readerLineSpacing", settings.line_spacing.toString());
       }
+
       if (settings?.reader_mode === "word" || settings?.reader_mode === "phrase") {
         setLookupMode(settings.reader_mode);
         persistLookupStyle(settings.reader_mode);
@@ -268,9 +455,9 @@ export default function ReaderView({ article }: ReaderViewProps) {
         }
       }
 
-        if (history?.last_position && history.last_position > 120) {
-          setResumePosition(history.last_position);
-        }
+      if (history?.last_position && history.last_position > 120) {
+        setResumePosition(history.last_position);
+      }
 
       if (shouldCacheOffline) {
         saveOfflineArticle({
@@ -346,6 +533,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
           ? 0
           : Math.min(100, Math.max(0, Math.round((container.scrollTop / scrollableHeight) * 100)))
       );
+      setIdiomTooltip(null);
       clearSelection();
     };
 
@@ -364,26 +552,83 @@ export default function ReaderView({ article }: ReaderViewProps) {
     };
   }, [article.id, clearSelection, supabase]);
 
-  const persistSetting = async (values: Record<string, unknown>) => {
-    const userId = userIdRef.current;
-    if (!supabase || !userId) return;
+  useEffect(() => {
+    if (!readingHelperEnabled) {
+      return;
+    }
 
-    await supabase.from("user_settings").upsert(
-      {
-        user_id: userId,
-        ...values,
-      },
-      { onConflict: "user_id" }
-    );
-  };
+    const cachedChunkedContent = chunkedContentCacheRef.current.get(article.id);
+    if (cachedChunkedContent) {
+      setChunkedContent(cachedChunkedContent);
+      setChunkingError(null);
+      return;
+    }
+
+    let isCancelled = false;
+    const controller = new AbortController();
+
+    const fetchChunkedContent = async () => {
+      setChunkingLoading(true);
+      setChunkingError(null);
+
+      try {
+        const response = await fetch("/api/chunk-text", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            content: article.content,
+            articleTitle: article.title,
+          }),
+        });
+
+        const data = (await response.json()) as { html?: string; error?: string };
+        if (!response.ok || !data.html) {
+          if (!isCancelled) {
+            setChunkingError(data.error || "Could not prepare chunked reading help.");
+          }
+          return;
+        }
+
+        if (isCancelled) return;
+
+        chunkedContentCacheRef.current.set(article.id, data.html);
+        setChunkedContent(data.html);
+      } catch (error) {
+        if (controller.signal.aborted || isCancelled) {
+          return;
+        }
+
+        console.error("Chunk text request failed:", error);
+        setChunkingError("Could not prepare chunked reading help right now.");
+      } finally {
+        if (!isCancelled) {
+          setChunkingLoading(false);
+        }
+      }
+    };
+
+    void fetchChunkedContent();
+
+    return () => {
+      isCancelled = true;
+      controller.abort();
+    };
+  }, [article.content, article.id, article.title, readingHelperEnabled]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
+      const sourceContent = readingHelperEnabled && chunkedContent ? chunkedContent : article.content;
+      const sanitizedContent = sanitizeReaderHtml(sourceContent);
+      const idiomEnhancedContent =
+        idiomScanCompleted && detectedIdioms.length > 0
+          ? highlightIdiomPhrases(sanitizedContent, detectedIdioms)
+          : sanitizedContent;
       const nextContent =
         deferredSavedVocabulary.length === 0
-          ? article.content
+          ? idiomEnhancedContent
           : highlightArticleContent(
-              article.content,
+              idiomEnhancedContent,
               deferredSavedVocabulary,
               savedWordPreview ? toSavedWordKey(savedWordPreview.word) : null
             );
@@ -394,7 +639,15 @@ export default function ReaderView({ article }: ReaderViewProps) {
     }, 0);
 
     return () => window.clearTimeout(timeout);
-  }, [article.content, deferredSavedVocabulary, savedWordPreview]);
+  }, [
+    article.content,
+    chunkedContent,
+    deferredSavedVocabulary,
+    detectedIdioms,
+    idiomScanCompleted,
+    readingHelperEnabled,
+    savedWordPreview,
+  ]);
 
   useEffect(() => {
     const container = contentRef.current;
@@ -403,6 +656,30 @@ export default function ReaderView({ article }: ReaderViewProps) {
     const handleClick = (event: MouseEvent) => {
       const target = event.target;
       if (!(target instanceof HTMLElement)) return;
+
+      const idiomHighlight = target.closest(".idiom-highlight") as HTMLElement | null;
+      if (idiomHighlight) {
+        if (window.getSelection()?.toString().trim()) {
+          return;
+        }
+
+        const phrase = idiomHighlight.dataset.phrase || idiomHighlight.textContent || "";
+        const meaning = idiomHighlight.dataset.meaning || "";
+        const type = idiomHighlight.dataset.type === "phrasal_verb" ? "phrasal_verb" : "idiom";
+        const rect = idiomHighlight.getBoundingClientRect();
+        const placement = rect.top > 160 ? "top" : "bottom";
+        const x = Math.min(window.innerWidth - 24, Math.max(24, rect.left + rect.width / 2));
+        const y = placement === "top" ? rect.top - 14 : rect.bottom + 14;
+
+        setIdiomTooltip({ phrase, meaning, type, x, y, placement });
+        setSavedWordPreview(null);
+        setLookupRequest(null);
+        setSentenceLookup(null);
+        clearSelection();
+        return;
+      }
+
+      setIdiomTooltip(null);
 
       const mark = target.closest("mark[data-word]") as HTMLElement | null;
       if (!mark) return;
@@ -419,14 +696,48 @@ export default function ReaderView({ article }: ReaderViewProps) {
 
       setSavedWordPreview(item);
       setLookupRequest(null);
+      setSentenceLookup(null);
       clearSelection();
     };
 
+    const handleDocumentClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+
+      if (container.contains(target) || tooltipRef.current?.contains(target)) {
+        return;
+      }
+
+      setIdiomTooltip(null);
+    };
+
     container.addEventListener("click", handleClick);
+    document.addEventListener("click", handleDocumentClick);
+
     return () => {
       container.removeEventListener("click", handleClick);
+      document.removeEventListener("click", handleDocumentClick);
     };
   }, [clearSelection]);
+
+  useEffect(() => {
+    return () => {
+      idiomRequestRef.current?.abort();
+    };
+  }, []);
+
+  const persistSetting = async (values: Record<string, unknown>) => {
+    const userId = userIdRef.current;
+    if (!supabase || !userId) return;
+
+    await supabase.from("user_settings").upsert(
+      {
+        user_id: userId,
+        ...values,
+      },
+      { onConflict: "user_id" }
+    );
+  };
 
   const formattedDate = article.published_at
     ? new Date(article.published_at).toLocaleDateString("en-US", {
@@ -464,8 +775,6 @@ export default function ReaderView({ article }: ReaderViewProps) {
     notesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const plainArticleText = article.content.replace(/<[^>]+>/g, " ");
-
   const handleWordSaved = (item: SavedVocabularyPreview) => {
     const existing = savedVocabularyMapRef.current.get(toSavedWordKey(item.word));
     const nextItems = existing
@@ -482,8 +791,22 @@ export default function ReaderView({ article }: ReaderViewProps) {
   const handleLookupAction = (intent: LookupIntent) => {
     if (!selection) return;
 
+    if (selection.kind === "sentence") {
+      setSavedWordPreview(null);
+      setLookupRequest(null);
+      setSentenceLookup({
+        text: selection.text,
+        sentence: selection.sentence,
+        paragraph: selection.paragraph,
+      });
+      clearSelection();
+      return;
+    }
+
     const mode = inferLookupMode(selection, lookupMode);
+    setIdiomTooltip(null);
     setSavedWordPreview(null);
+    setSentenceLookup(null);
     setLookupRequest({
       text: selection.text,
       sentence: selection.sentence,
@@ -494,12 +817,80 @@ export default function ReaderView({ article }: ReaderViewProps) {
     clearSelection();
   };
 
-  const activeSelectionMode = selection ? inferLookupMode(selection, lookupMode) : null;
+  const handleReadingHelperToggle = (enabled: boolean) => {
+    setReadingHelperEnabled(enabled);
+    setChunkingError(null);
+  };
+
+  const handleDetectIdioms = async () => {
+    const cachedIdioms = idiomCacheRef.current.get(article.id);
+    if (cachedIdioms) {
+      setDetectedIdioms(cachedIdioms);
+      setIdiomScanCompleted(true);
+      setIdiomError(null);
+      return;
+    }
+
+    idiomRequestRef.current?.abort();
+    const controller = new AbortController();
+    idiomRequestRef.current = controller;
+
+    setIdiomDetectionLoading(true);
+    setIdiomError(null);
+    setIdiomTooltip(null);
+
+    try {
+      const response = await fetch("/api/detect-idioms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          content: article.content,
+          articleTitle: article.title,
+        }),
+      });
+
+      const data = (await response.json()) as DetectedIdiom[] | { error?: string };
+      if (!response.ok) {
+        setIdiomError("error" in data ? data.error || "Could not detect idioms." : "Could not detect idioms.");
+        return;
+      }
+
+      const nextIdioms = Array.isArray(data) ? data : [];
+      idiomCacheRef.current.set(article.id, nextIdioms);
+      setDetectedIdioms(nextIdioms);
+      setIdiomScanCompleted(true);
+    } catch (error) {
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      console.error("Detect idioms request failed:", error);
+      setIdiomError("Could not detect idioms right now.");
+    } finally {
+      if (!controller.signal.aborted) {
+        setIdiomDetectionLoading(false);
+      }
+    }
+  };
+
+  const plainArticleText = article.content.replace(/<[^>]+>/g, " ");
+  const activeSelectionMode = selection
+    ? selection.kind === "sentence"
+      ? "sentence"
+      : selection.kind === "paragraph"
+        ? "paragraph"
+        : inferLookupMode(selection, lookupMode)
+    : null;
+  const selectionPrimaryLabel = selection?.kind === "sentence" ? "Look up" : "Translate";
+  const showExplainAction =
+    selection && selection.kind !== "sentence" && activeSelectionMode !== null && activeSelectionMode !== "vocab";
 
   return (
     <div className="h-dvh flex flex-col overflow-hidden">
       <ProfileBootstrap />
       <ReaderControls
+        key={article.id}
         fontSize={fontSize}
         lineSpacing={lineSpacing}
         lookupMode={lookupMode}
@@ -508,9 +899,16 @@ export default function ReaderView({ article }: ReaderViewProps) {
         articleText={plainArticleText}
         articleUrl={article.url}
         readingProgress={readingProgress}
+        readingHelperEnabled={readingHelperEnabled}
+        readingHelperLoading={chunkingLoading}
+        idiomDetectionLoading={idiomDetectionLoading}
+        idiomCount={detectedIdioms.length}
+        idiomScanCompleted={idiomScanCompleted}
         onFontSizeChange={handleFontSizeChange}
         onLineSpacingChange={handleLineSpacingChange}
         onLookupModeChange={handleLookupModeChange}
+        onReadingHelperToggle={handleReadingHelperToggle}
+        onDetectIdioms={() => void handleDetectIdioms()}
         onJumpToNotes={handleJumpToNotes}
       />
 
@@ -539,6 +937,16 @@ export default function ReaderView({ article }: ReaderViewProps) {
                   <RotateCcw size={12} />
                   <span className="chip-truncate">Resume where you left off</span>
                 </button>
+              )}
+              {readingHelperEnabled && !chunkingLoading && chunkedContent && (
+                <span className="glass-chip inline-flex max-w-full items-center gap-1 rounded-full px-3 py-1 text-xs font-medium text-primary">
+                  Reading helper on
+                </span>
+              )}
+              {idiomScanCompleted && detectedIdioms.length > 0 && (
+                <span className="glass-chip inline-flex max-w-full items-center gap-1 rounded-full px-3 py-1 text-xs font-medium text-orange-500">
+                  {detectedIdioms.length} idioms highlighted
+                </span>
               )}
             </div>
 
@@ -589,6 +997,49 @@ export default function ReaderView({ article }: ReaderViewProps) {
           )}
 
           <div className="reader-paper rounded-[2rem] px-5 py-6 sm:px-8">
+            {(readingHelperEnabled || idiomScanCompleted || chunkingError || idiomError) && (
+              <div className="mb-4 space-y-2">
+                {readingHelperEnabled && (
+                  <div className="glass-panel flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-muted">
+                    {chunkingLoading ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        Preparing chunking and collocation guides...
+                      </>
+                    ) : chunkedContent ? (
+                      <>Chunking helper is active for this article.</>
+                    ) : (
+                      <>Chunking helper is ready when the analysis completes.</>
+                    )}
+                  </div>
+                )}
+
+                {idiomScanCompleted && detectedIdioms.length > 0 && (
+                  <div className="rounded-xl bg-orange-400/10 px-3 py-2 text-sm text-orange-500">
+                    Tap the orange dashed phrases to see Thai meanings.
+                  </div>
+                )}
+
+                {idiomScanCompleted && detectedIdioms.length === 0 && !idiomError && !idiomDetectionLoading && (
+                  <div className="glass-panel rounded-xl px-3 py-2 text-sm text-muted">
+                    No standout idioms or phrasal verbs were detected in this article.
+                  </div>
+                )}
+
+                {chunkingError && (
+                  <div className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">
+                    {chunkingError}
+                  </div>
+                )}
+
+                {idiomError && (
+                  <div className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">
+                    {idiomError}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div
               ref={contentRef}
               className="article-content prose max-w-none dark:prose-invert"
@@ -611,7 +1062,28 @@ export default function ReaderView({ article }: ReaderViewProps) {
         </article>
       </div>
 
-      {!selection && selectionNotice && !lookupRequest && !savedWordPreview && (
+      {idiomTooltip && (
+        <div
+          ref={tooltipRef}
+          className="pointer-events-auto fixed z-40 w-[min(18rem,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl border border-orange-400/20 bg-white/95 px-4 py-3 shadow-lg shadow-slate-950/15 dark:bg-slate-900/95"
+          style={{
+            left: idiomTooltip.x,
+            top: idiomTooltip.y,
+            transform:
+              idiomTooltip.placement === "top"
+                ? "translate(-50%, -100%)"
+                : "translate(-50%, 0)",
+          }}
+        >
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-orange-500">
+            {idiomTooltip.type === "phrasal_verb" ? "Phrasal Verb" : "Idiom"}
+          </p>
+          <p className="mt-1 text-sm font-semibold text-foreground">{idiomTooltip.phrase}</p>
+          <p className="mt-2 text-sm leading-6 text-muted">{idiomTooltip.meaning}</p>
+        </div>
+      )}
+
+      {!selection && selectionNotice && !lookupRequest && !sentenceLookup && !savedWordPreview && (
         <div className="fixed bottom-0 left-0 right-0 z-30 pb-safe">
           <div className="mx-auto max-w-lg px-4 pb-4">
             <div className="glass-panel text-safe-body rounded-xl px-4 py-3 text-sm text-warning">
@@ -621,28 +1093,35 @@ export default function ReaderView({ article }: ReaderViewProps) {
         </div>
       )}
 
-      {selection && activeSelectionMode && !lookupRequest && !savedWordPreview && (
+      {selection && activeSelectionMode && !lookupRequest && !sentenceLookup && !savedWordPreview && (
         <SelectionActionBar
           text={selection.text}
           mode={activeSelectionMode}
+          primaryLabel={selectionPrimaryLabel}
           onTranslate={() => handleLookupAction("translate")}
-          onExplain={
-            activeSelectionMode === "vocab"
-              ? undefined
-              : () => handleLookupAction("explain")
-          }
+          onExplain={showExplainAction ? () => handleLookupAction("explain") : undefined}
           onDismiss={clearSelection}
         />
       )}
 
-      {savedWordPreview && !lookupRequest && (
+      {savedWordPreview && !lookupRequest && !sentenceLookup && (
         <SavedWordPopup
           item={savedWordPreview}
           onClose={() => setSavedWordPreview(null)}
         />
       )}
 
-      {lookupRequest && (
+      {sentenceLookup && !lookupRequest && (
+        <SentencePopup
+          selection={sentenceLookup}
+          articleId={article.id}
+          articleTitle={article.title}
+          cacheRef={sentenceAnalysisCacheRef}
+          onClose={() => setSentenceLookup(null)}
+        />
+      )}
+
+      {lookupRequest && !sentenceLookup && (
         <VocabPopup
           lookup={lookupRequest}
           articleId={article.id}

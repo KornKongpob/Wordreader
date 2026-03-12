@@ -1,16 +1,65 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+type SelectionKind = "short" | "sentence" | "paragraph";
 
 interface TextSelection {
   text: string;
   sentence: string;
   paragraph: string;
   position: { x: number; y: number };
+  wordCount: number;
+  kind: SelectionKind;
 }
 
 interface UseTextSelectionOptions {
   maxLength?: number;
+}
+
+function normalizeText(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function countWords(value: string) {
+  return normalizeText(value)
+    .split(" ")
+    .filter(Boolean).length;
+}
+
+function countSentences(value: string) {
+  return normalizeText(value)
+    .split(/(?<=[.!?])\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean).length;
+}
+
+function normalizeBoundaryText(value: string) {
+  return normalizeText(value).replace(/^[("'“”‘’\s]+|[)"'“”‘’\s.!?,;:]+$/g, "");
+}
+
+function inferSelectionKind(text: string, sentence: string, paragraph: string): SelectionKind {
+  const normalizedText = normalizeText(text);
+  const normalizedSentence = normalizeText(sentence);
+  const normalizedParagraph = normalizeText(paragraph);
+  const selectedWordCount = countWords(normalizedText);
+
+  if (
+    normalizedParagraph &&
+    normalizedText === normalizedParagraph &&
+    countSentences(normalizedParagraph) > 1
+  ) {
+    return "paragraph";
+  }
+
+  if (
+    selectedWordCount > 4 &&
+    normalizeBoundaryText(normalizedText) === normalizeBoundaryText(normalizedSentence)
+  ) {
+    return "sentence";
+  }
+
+  return "short";
 }
 
 export function useTextSelection(
@@ -21,105 +70,116 @@ export function useTextSelection(
   const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
   const isProcessing = useRef(false);
   const maxLength = options.maxLength ?? 100;
-  const getBlockElement = useCallback((node: Node): HTMLElement | null => {
-    const container = containerRef.current;
-    let current: Node | null = node.nodeType === Node.TEXT_NODE ? node.parentNode : node;
 
-    while (current && current !== container) {
-      if (current instanceof HTMLElement) {
-        const tag = current.tagName.toLowerCase();
-        if (["p", "li", "blockquote", "figcaption"].includes(tag) || /^h[1-6]$/.test(tag)) {
-          return current;
+  const getBlockElement = useCallback(
+    (node: Node): HTMLElement | null => {
+      const container = containerRef.current;
+      let current: Node | null = node.nodeType === Node.TEXT_NODE ? node.parentNode : node;
+
+      while (current && current !== container) {
+        if (current instanceof HTMLElement) {
+          const tag = current.tagName.toLowerCase();
+          if (["p", "li", "blockquote", "figcaption"].includes(tag) || /^h[1-6]$/.test(tag)) {
+            return current;
+          }
         }
-      }
-      current = current.parentNode;
-    }
 
-    return null;
-  }, [containerRef]);
-
-  const getSentenceFromRange = useCallback((range: Range): string => {
-    const selectedText = range.toString().trim();
-    if (!selectedText) return "";
-
-    const container = containerRef.current;
-    let scope: Node = getBlockElement(range.startContainer) ?? range.commonAncestorContainer;
-
-    if (scope.nodeType === Node.TEXT_NODE) {
-      scope = scope.parentNode ?? scope;
-    }
-
-    while (scope.parentNode && scope.parentNode !== container) {
-      if (scope instanceof HTMLElement) {
-        const tag = scope.tagName.toLowerCase();
-        if (["p", "li", "blockquote", "figcaption"].includes(tag) || /^h[1-6]$/.test(tag)) {
-          break;
-        }
-      }
-      scope = scope.parentNode;
-    }
-
-    try {
-      const fullText = scope.textContent || "";
-      if (!fullText) return selectedText;
-
-      const beforeRange = range.cloneRange();
-      beforeRange.selectNodeContents(scope);
-      beforeRange.setEnd(range.startContainer, range.startOffset);
-
-      const startIndex = beforeRange.toString().length;
-      const endIndex = startIndex + range.toString().length;
-
-      let sentenceStart = 0;
-      for (let i = startIndex - 1; i >= 0; i--) {
-        if (".!?\n".includes(fullText[i])) {
-          sentenceStart = i + 1;
-          break;
-        }
+        current = current.parentNode;
       }
 
-      let sentenceEnd = fullText.length;
-      for (let i = endIndex; i < fullText.length; i++) {
-        if (".!?\n".includes(fullText[i])) {
-          sentenceEnd = i + 1;
-          break;
-        }
+      return null;
+    },
+    [containerRef]
+  );
+
+  const getSentenceFromRange = useCallback(
+    (range: Range): string => {
+      const selectedText = range.toString().trim();
+      if (!selectedText) return "";
+
+      const container = containerRef.current;
+      let scope: Node = getBlockElement(range.startContainer) ?? range.commonAncestorContainer;
+
+      if (scope.nodeType === Node.TEXT_NODE) {
+        scope = scope.parentNode ?? scope;
       }
 
-      return fullText.slice(sentenceStart, sentenceEnd).replace(/\s+/g, " ").trim();
-    } catch {
-      return selectedText;
-    }
-  }, [containerRef, getBlockElement]);
+      while (scope.parentNode && scope.parentNode !== container) {
+        if (scope instanceof HTMLElement) {
+          const tag = scope.tagName.toLowerCase();
+          if (["p", "li", "blockquote", "figcaption"].includes(tag) || /^h[1-6]$/.test(tag)) {
+            break;
+          }
+        }
 
-  const getParagraphFromRange = useCallback((range: Range): string => {
-    const selectedText = range.toString().trim();
-    if (!selectedText) return "";
+        scope = scope.parentNode;
+      }
 
-    const startBlock = getBlockElement(range.startContainer);
-    const endBlock = getBlockElement(range.endContainer);
+      try {
+        const fullText = scope.textContent || "";
+        if (!fullText) return selectedText;
 
-    if (startBlock && endBlock && startBlock === endBlock) {
-      return startBlock.textContent?.replace(/\s+/g, " ").trim() || selectedText;
-    }
+        const beforeRange = range.cloneRange();
+        beforeRange.selectNodeContents(scope);
+        beforeRange.setEnd(range.startContainer, range.startOffset);
 
-    return selectedText.replace(/\s+/g, " ").trim();
-  }, [getBlockElement]);
+        const startIndex = beforeRange.toString().length;
+        const endIndex = startIndex + range.toString().length;
+
+        let sentenceStart = 0;
+        for (let index = startIndex - 1; index >= 0; index -= 1) {
+          if (".!?\n".includes(fullText[index])) {
+            sentenceStart = index + 1;
+            break;
+          }
+        }
+
+        let sentenceEnd = fullText.length;
+        for (let index = endIndex; index < fullText.length; index += 1) {
+          if (".!?\n".includes(fullText[index])) {
+            sentenceEnd = index + 1;
+            break;
+          }
+        }
+
+        return normalizeText(fullText.slice(sentenceStart, sentenceEnd));
+      } catch {
+        return normalizeText(selectedText);
+      }
+    },
+    [containerRef, getBlockElement]
+  );
+
+  const getParagraphFromRange = useCallback(
+    (range: Range): string => {
+      const selectedText = range.toString().trim();
+      if (!selectedText) return "";
+
+      const startBlock = getBlockElement(range.startContainer);
+      const endBlock = getBlockElement(range.endContainer);
+
+      if (startBlock && endBlock && startBlock === endBlock) {
+        return normalizeText(startBlock.textContent || selectedText);
+      }
+
+      return normalizeText(selectedText);
+    },
+    [getBlockElement]
+  );
 
   const handleSelectionChange = useCallback(() => {
     if (isProcessing.current) return;
 
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed || !sel.rangeCount) {
+    const browserSelection = window.getSelection();
+    if (!browserSelection || browserSelection.isCollapsed || !browserSelection.rangeCount) {
       setSelection(null);
       setSelectionNotice(null);
       return;
     }
 
-    const range = sel.getRangeAt(0);
-    const text = sel.toString().trim();
+    const range = browserSelection.getRangeAt(0);
+    const text = normalizeText(browserSelection.toString());
 
-    // Ignore empty or very long selections
     if (!text || text.length > maxLength) {
       setSelection(null);
       setSelectionNotice(
@@ -132,24 +192,27 @@ export function useTextSelection(
 
     setSelectionNotice(null);
 
-    // Only handle selections within our container
     if (containerRef.current && !containerRef.current.contains(range.commonAncestorContainer)) {
       setSelection(null);
       return;
     }
 
-    // Get position for the popup
     const rect = range.getBoundingClientRect();
-    const position = {
-      x: rect.left + rect.width / 2,
-      y: rect.bottom + 8,
-    };
-
-    // Get the sentence
     const sentence = getSentenceFromRange(range);
     const paragraph = getParagraphFromRange(range);
+    const kind = inferSelectionKind(text, sentence, paragraph);
 
-    setSelection({ text, sentence, paragraph, position });
+    setSelection({
+      text,
+      sentence,
+      paragraph,
+      position: {
+        x: rect.left + rect.width / 2,
+        y: rect.bottom + 8,
+      },
+      wordCount: countWords(text),
+      kind,
+    });
   }, [containerRef, getParagraphFromRange, getSentenceFromRange, maxLength]);
 
   const clearSelection = useCallback(() => {
@@ -159,21 +222,19 @@ export function useTextSelection(
   }, []);
 
   useEffect(() => {
-    // Use mouseup/touchend to detect selection (more reliable on mobile Safari)
-    const handleMouseUp = () => {
-      // Small delay to let the browser finalize the selection
-      setTimeout(handleSelectionChange, 10);
+    const handlePointerUp = () => {
+      window.setTimeout(handleSelectionChange, 10);
     };
 
     const container = containerRef.current;
     if (!container) return;
 
-    container.addEventListener("mouseup", handleMouseUp);
-    container.addEventListener("touchend", handleMouseUp);
+    container.addEventListener("mouseup", handlePointerUp);
+    container.addEventListener("touchend", handlePointerUp);
 
     return () => {
-      container.removeEventListener("mouseup", handleMouseUp);
-      container.removeEventListener("touchend", handleMouseUp);
+      container.removeEventListener("mouseup", handlePointerUp);
+      container.removeEventListener("touchend", handlePointerUp);
     };
   }, [containerRef, handleSelectionChange]);
 
