@@ -1,11 +1,6 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
-import AppShell from "@/components/layout/AppShell";
-import { useTheme } from "@/components/layout/ThemeProvider";
-import { getStoredLookupStyle, persistLookupStyle } from "@/lib/lookup";
-import { createClient } from "@/lib/supabase/client";
-import { getOfflineArticles } from "@/lib/offline";
 import { useRouter } from "next/navigation";
 import {
   Bell,
@@ -20,35 +15,21 @@ import {
   Sun,
   User,
 } from "lucide-react";
-import type { ReaderLookupStyle } from "@/types";
-
-function getStoredFontSize() {
-  if (typeof window === "undefined") return 18;
-  const savedFontSize = localStorage.getItem("readerFontSize");
-  return savedFontSize ? parseInt(savedFontSize, 10) : 18;
-}
-
-function getStoredLineSpacing() {
-  if (typeof window === "undefined") return 1.6;
-  const savedLineSpacing = localStorage.getItem("readerLineSpacing");
-  return savedLineSpacing ? parseFloat(savedLineSpacing) : 1.6;
-}
+import AppShell from "@/components/layout/AppShell";
+import { useUserSettings } from "@/components/layout/UserSettingsProvider";
+import { useTheme } from "@/components/layout/ThemeProvider";
+import { getOfflineArticles } from "@/lib/offline";
+import { createClient } from "@/lib/supabase/client";
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
+  const { settings, updateSettings } = useUserSettings();
   const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
   const [vocabCount, setVocabCount] = useState(0);
   const [articleCount, setArticleCount] = useState(0);
   const [dueCount, setDueCount] = useState(0);
   const [offlineCount] = useState(() => getOfflineArticles().length);
-  const [defaultFontSize, setDefaultFontSize] = useState(getStoredFontSize);
-  const [defaultLineSpacing, setDefaultLineSpacing] = useState(getStoredLineSpacing);
-  const [lookupMode, setLookupMode] = useState<ReaderLookupStyle>(getStoredLookupStyle);
-  const [reviewGoal, setReviewGoal] = useState(10);
-  const [enableNotifications, setEnableNotifications] = useState(false);
-  const [reminderHour, setReminderHour] = useState(19);
-  const [enableOffline, setEnableOffline] = useState(true);
   const [notificationState, setNotificationState] = useState(() =>
     typeof window !== "undefined" && "Notification" in window
       ? Notification.permission
@@ -56,7 +37,7 @@ export default function SettingsPage() {
   );
 
   useEffect(() => {
-    const loadSettings = async () => {
+    const loadAccountSummary = async () => {
       const supabase = createClient();
       if (!supabase) return;
 
@@ -67,108 +48,36 @@ export default function SettingsPage() {
       if (!user) return;
       setEmail(user.email || null);
 
-      const [{ count: vCount }, { data: readingHistory }, { data: settings }, { count: due }] =
-        await Promise.all([
-          supabase
-            .from("vocabulary_items")
-            .select("*", { count: "exact", head: true })
-            .eq("user_id", user.id),
-          supabase
-            .from("reading_history")
-            .select("article_id")
-            .eq("user_id", user.id),
-          supabase
-            .from("user_settings")
-            .select(
-              "font_size, line_spacing, review_goal, enable_notifications, reminder_hour, enable_offline, reader_mode"
-            )
-            .eq("user_id", user.id)
-            .maybeSingle(),
-          supabase
-            .from("review_states")
-            .select("*", { count: "exact", head: true })
-            .eq("user_id", user.id)
-            .lte("next_review_at", new Date().toISOString()),
-        ]);
+      const [{ count: vCount }, { data: readingHistory }, { count: due }] = await Promise.all([
+        supabase
+          .from("vocabulary_items")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", user.id),
+        supabase
+          .from("reading_history")
+          .select("article_id")
+          .eq("user_id", user.id),
+        supabase
+          .from("review_states")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .lte("next_review_at", new Date().toISOString()),
+      ]);
 
       if (vCount !== null) setVocabCount(vCount);
       if (due !== null) setDueCount(due);
       if (readingHistory) {
         setArticleCount(
-          new Set(
-            readingHistory.map((row: { article_id: string }) => row.article_id)
-          ).size
+          new Set(readingHistory.map((row: { article_id: string }) => row.article_id)).size
         );
-      }
-
-      if (settings?.font_size) {
-        setDefaultFontSize(settings.font_size);
-        localStorage.setItem("readerFontSize", settings.font_size.toString());
-      }
-      if (settings?.line_spacing) {
-        setDefaultLineSpacing(settings.line_spacing);
-        localStorage.setItem("readerLineSpacing", settings.line_spacing.toString());
-      }
-      if (settings?.review_goal) {
-        setReviewGoal(settings.review_goal);
-      }
-      if (settings?.enable_notifications !== undefined) {
-        setEnableNotifications(settings.enable_notifications);
-      }
-      if (typeof settings?.reminder_hour === "number") {
-        setReminderHour(settings.reminder_hour);
-      }
-      if (settings?.enable_offline !== undefined) {
-        setEnableOffline(settings.enable_offline);
-      }
-      if (settings?.reader_mode === "word" || settings?.reader_mode === "phrase") {
-        setLookupMode(settings.reader_mode);
-        persistLookupStyle(settings.reader_mode);
       }
     };
 
-    void loadSettings();
+    void loadAccountSummary();
   }, []);
 
-  const saveSettings = async (values: Record<string, unknown>) => {
-    const supabase = createClient();
-    if (!supabase) return;
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) return;
-
-    await supabase.from("user_settings").upsert(
-      {
-        user_id: user.id,
-        ...values,
-      },
-      { onConflict: "user_id" }
-    );
-  };
-
-  const handleFontSizeChange = (size: number) => {
-    setDefaultFontSize(size);
-    localStorage.setItem("readerFontSize", size.toString());
-    void saveSettings({ font_size: size });
-  };
-
-  const handleLineSpacingChange = (spacing: number) => {
-    setDefaultLineSpacing(spacing);
-    localStorage.setItem("readerLineSpacing", spacing.toString());
-    void saveSettings({ line_spacing: spacing });
-  };
-
-  const handleLookupModeChange = (mode: ReaderLookupStyle) => {
-    setLookupMode(mode);
-    persistLookupStyle(mode);
-    void saveSettings({ reader_mode: mode });
-  };
-
   const handleToggleNotifications = async () => {
-    const nextValue = !enableNotifications;
+    const nextValue = !settings.enableNotifications;
 
     if (
       nextValue &&
@@ -179,8 +88,7 @@ export default function SettingsPage() {
       const permission = await Notification.requestPermission();
       setNotificationState(permission);
       if (permission === "denied") {
-        setEnableNotifications(false);
-        await saveSettings({ enable_notifications: false });
+        await updateSettings({ enableNotifications: false });
         return;
       }
     }
@@ -189,8 +97,7 @@ export default function SettingsPage() {
       setNotificationState(Notification.permission);
     }
 
-    setEnableNotifications(nextValue);
-    await saveSettings({ enable_notifications: nextValue });
+    await updateSettings({ enableNotifications: nextValue });
   };
 
   const handleSignOut = async () => {
@@ -254,9 +161,7 @@ export default function SettingsPage() {
                 key={value}
                 onClick={() => setTheme(value)}
                 className={`flex flex-col items-center gap-2 rounded-xl p-4 transition ${
-                  theme === value
-                    ? "glass-chip text-primary"
-                    : "glass-panel text-muted"
+                  theme === value ? "glass-chip text-primary" : "glass-panel text-muted"
                 }`}
               >
                 <Icon size={20} />
@@ -279,15 +184,15 @@ export default function SettingsPage() {
               <div className="flex items-center gap-3 self-stretch sm:self-auto">
                 <button
                   type="button"
-                  onClick={() => handleFontSizeChange(Math.max(14, defaultFontSize - 2))}
+                  onClick={() => void updateSettings({ fontSize: Math.max(14, settings.fontSize - 2) })}
                   className="subtle-button flex h-8 w-8 items-center justify-center rounded-lg text-muted transition hover:text-foreground"
                 >
                   <Minus size={14} />
                 </button>
-                <span className="w-8 text-center text-sm font-medium">{defaultFontSize}</span>
+                <span className="w-8 text-center text-sm font-medium">{settings.fontSize}</span>
                 <button
                   type="button"
-                  onClick={() => handleFontSizeChange(Math.min(28, defaultFontSize + 2))}
+                  onClick={() => void updateSettings({ fontSize: Math.min(28, settings.fontSize + 2) })}
                   className="subtle-button flex h-8 w-8 items-center justify-center rounded-lg text-muted transition hover:text-foreground"
                 >
                   <Plus size={14} />
@@ -302,9 +207,9 @@ export default function SettingsPage() {
                   <button
                     key={value}
                     type="button"
-                    onClick={() => handleLineSpacingChange(value)}
+                    onClick={() => void updateSettings({ lineSpacing: value })}
                     className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
-                      defaultLineSpacing === value
+                      settings.lineSpacing === value
                         ? "glow-button text-primary-foreground"
                         : "subtle-button text-muted"
                     }`}
@@ -322,14 +227,81 @@ export default function SettingsPage() {
                   <button
                     key={mode}
                     type="button"
-                    onClick={() => handleLookupModeChange(mode)}
+                    onClick={() => void updateSettings({ readerMode: mode })}
                     className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                      lookupMode === mode
+                      settings.readerMode === mode
                         ? "glow-button text-primary-foreground"
                         : "subtle-button text-muted"
                     }`}
                   >
                     {mode === "word" ? "Word focus" : "Smart"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-safe-title text-sm">Sentence action</span>
+              <div className="flex flex-wrap gap-2">
+                {(["translate", "explain"] as const).map((intent) => (
+                  <button
+                    key={intent}
+                    type="button"
+                    onClick={() => void updateSettings({ defaultLookupIntent: intent })}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                      settings.defaultLookupIntent === intent
+                        ? "glow-button text-primary-foreground"
+                        : "subtle-button text-muted"
+                    }`}
+                  >
+                    {intent === "translate" ? "Translate first" : "Explain first"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-safe-title text-sm">Tap behavior</span>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  { value: "word", label: "Tap word" },
+                  { value: "sentence", label: "Tap sentence" },
+                  { value: "off", label: "Off" },
+                ] as const).map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => void updateSettings({ tapBehavior: option.value })}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                      settings.tapBehavior === option.value
+                        ? "glow-button text-primary-foreground"
+                        : "subtle-button text-muted"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-safe-title text-sm">App language</span>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  { value: "en", label: "English UI" },
+                  { value: "th", label: "Thai UI" },
+                ] as const).map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => void updateSettings({ uiLanguage: option.value })}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                      settings.uiLanguage === option.value
+                        ? "glow-button text-primary-foreground"
+                        : "subtle-button text-muted"
+                    }`}
+                  >
+                    {option.label}
                   </button>
                 ))}
               </div>
@@ -355,23 +327,19 @@ export default function SettingsPage() {
               <div className="flex items-center gap-3 self-stretch sm:self-auto">
                 <button
                   type="button"
-                  onClick={() => {
-                    const next = Math.max(5, reviewGoal - 5);
-                    setReviewGoal(next);
-                    void saveSettings({ review_goal: next });
-                  }}
+                  onClick={() =>
+                    void updateSettings({ reviewGoal: Math.max(5, settings.reviewGoal - 5) })
+                  }
                   className="subtle-button flex h-8 w-8 items-center justify-center rounded-lg text-muted"
                 >
                   <Minus size={14} />
                 </button>
-                <span className="w-10 text-center text-sm font-medium">{reviewGoal}</span>
+                <span className="w-10 text-center text-sm font-medium">{settings.reviewGoal}</span>
                 <button
                   type="button"
-                  onClick={() => {
-                    const next = Math.min(50, reviewGoal + 5);
-                    setReviewGoal(next);
-                    void saveSettings({ review_goal: next });
-                  }}
+                  onClick={() =>
+                    void updateSettings({ reviewGoal: Math.min(50, settings.reviewGoal + 5) })
+                  }
                   className="subtle-button flex h-8 w-8 items-center justify-center rounded-lg text-muted"
                 >
                   <Plus size={14} />
@@ -398,18 +366,14 @@ export default function SettingsPage() {
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  const next = !enableOffline;
-                  setEnableOffline(next);
-                  void saveSettings({ enable_offline: next });
-                }}
+                onClick={() => void updateSettings({ enableOffline: !settings.enableOffline })}
                 className={`w-full rounded-full px-3 py-1 text-xs font-medium sm:w-auto ${
-                  enableOffline
+                  settings.enableOffline
                     ? "glow-button text-primary-foreground"
                     : "glass-chip text-muted"
                 }`}
               >
-                {enableOffline ? "On" : "Off"}
+                {settings.enableOffline ? "On" : "Off"}
               </button>
             </div>
 
@@ -427,12 +391,12 @@ export default function SettingsPage() {
                 type="button"
                 onClick={() => void handleToggleNotifications()}
                 className={`w-full rounded-full px-3 py-1 text-xs font-medium sm:w-auto ${
-                  enableNotifications
+                  settings.enableNotifications
                     ? "glow-button text-primary-foreground"
                     : "glass-chip text-muted"
                 }`}
               >
-                {enableNotifications ? "On" : "Off"}
+                {settings.enableNotifications ? "On" : "Off"}
               </button>
             </div>
 
@@ -444,11 +408,9 @@ export default function SettingsPage() {
                 </p>
               </div>
               <select
-                value={reminderHour}
+                value={settings.reminderHour}
                 onChange={(event) => {
-                  const next = Number(event.target.value);
-                  setReminderHour(next);
-                  void saveSettings({ reminder_hour: next });
+                  void updateSettings({ reminderHour: Number(event.target.value) });
                 }}
                 className="glass-input w-full rounded-xl px-3 py-2 text-sm outline-none sm:w-auto"
               >
@@ -482,4 +444,3 @@ export default function SettingsPage() {
     </AppShell>
   );
 }
-

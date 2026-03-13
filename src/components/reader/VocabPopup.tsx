@@ -3,13 +3,11 @@
 import { useEffect, useState, type MutableRefObject } from "react";
 import { BookmarkPlus, Check, Loader2, Sparkles, X } from "lucide-react";
 import SpeakButton from "@/components/common/SpeakButton";
-import { createClient } from "@/lib/supabase/client";
 import {
   createLookupCacheKey,
   normalizeLookupText,
   type LookupRequest,
 } from "@/lib/lookup";
-import { getUserWithProfile } from "@/lib/supabase/ensureProfile";
 import type {
   LookupResult,
   ParagraphExplainResult,
@@ -142,121 +140,41 @@ export default function VocabPopup({
     setError(null);
 
     try {
-      const normalizedWord = result.text.trim();
-      const supabase = createClient();
-      if (!supabase) {
-        setError("Supabase is not configured.");
-        setSaving(false);
-        return;
-      }
-
-      const { user, error: userError } = await getUserWithProfile(supabase);
-
-      if (!user || userError) {
-        setError(userError || "Please sign in to save vocabulary.");
-        setSaving(false);
-        return;
-      }
-
-      const { data: existingItem, error: existingItemError } = await supabase
-        .from("vocabulary_items")
-        .select("id")
-        .eq("user_id", user.id)
-        .ilike("word", normalizedWord)
-        .maybeSingle();
-
-      if (existingItemError) {
-        setError(existingItemError.message);
-        setSaving(false);
-        return;
-      }
-
-      let vocabItemId: string;
-
-      if (existingItem) {
-        vocabItemId = existingItem.id;
-
-        const { error: updateError } = await supabase
-          .from("vocabulary_items")
-          .update({
+      const response = await fetch("/api/vocabulary/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          articleId,
+          articleTitle,
+          articleSourceName,
+          text: activeLookup.text,
+          sentence: activeLookup.sentence,
+          paragraph: activeLookup.paragraph,
+          translation: {
+            text: result.text,
             thai_meaning: result.thai_meaning,
             english_meaning: result.english_meaning,
             part_of_speech: result.part_of_speech,
+            contextual_meaning: result.contextual_meaning,
+            context_explanation: result.context_explanation,
             difficulty: result.difficulty,
-            last_source_name: articleSourceName,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", vocabItemId);
-
-        if (updateError) {
-          setError(updateError.message);
-          setSaving(false);
-          return;
-        }
-      } else {
-        const { data: newItem, error: insertError } = await supabase
-          .from("vocabulary_items")
-          .insert({
-            user_id: user.id,
-            word: normalizedWord,
-            thai_meaning: result.thai_meaning,
-            english_meaning: result.english_meaning,
-            part_of_speech: result.part_of_speech,
-            difficulty: result.difficulty,
-            pronunciation: normalizedWord,
-            last_source_name: articleSourceName,
-          })
-          .select("id")
-          .single();
-
-        if (insertError || !newItem) {
-          setError("Could not save word. Please try again.");
-          setSaving(false);
-          return;
-        }
-
-        vocabItemId = newItem.id;
-
-        const { error: reviewStateError } = await supabase.from("review_states").upsert(
-          {
-            user_id: user.id,
-            vocabulary_item_id: vocabItemId,
           },
-          { onConflict: "user_id,vocabulary_item_id" }
-        );
-
-        if (reviewStateError) {
-          setError(reviewStateError.message);
-          setSaving(false);
-          return;
-        }
-      }
-
-      const { error: contextError } = await supabase.from("vocabulary_contexts").insert({
-        vocabulary_item_id: vocabItemId,
-        article_id: articleId,
-        original_sentence: activeLookup.sentence,
-        contextual_meaning: result.contextual_meaning,
-        context_explanation: result.context_explanation,
+        }),
       });
 
-      if (contextError) {
-        setError(contextError.message);
+      const data = (await response.json()) as {
+        error?: string;
+        item?: SavedVocabularyPreview;
+      };
+
+      if (!response.ok || !data.item) {
+        setError(data.error || "Could not save word. Please try again.");
         setSaving(false);
         return;
       }
 
       setSaved(true);
-      onSaved?.({
-        id: vocabItemId,
-        word: normalizedWord,
-        thai_meaning: result.thai_meaning,
-        english_meaning: result.english_meaning,
-        part_of_speech: result.part_of_speech,
-        difficulty: result.difficulty,
-        pronunciation: normalizedWord,
-        last_source_name: articleSourceName,
-      });
+      onSaved?.(data.item);
     } catch (saveError) {
       console.error("Save vocabulary failed:", saveError);
       setError("Could not save. Please try again.");

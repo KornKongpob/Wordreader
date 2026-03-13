@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { sanitizeReaderHtml } from "@/lib/reader-html";
 import { notFound } from "next/navigation";
 import ReaderView from "@/components/reader/ReaderView";
 import type { Article } from "@/types";
@@ -23,5 +24,12 @@ export default async function ReaderPage({ params }: PageProps) {
     notFound();
   }
 
-  return <ReaderView article={article as Article} />;
+  return (
+    <ReaderView
+      article={{
+        ...(article as Article),
+        content: sanitizeReaderHtml((article as Article).content),
+      }}
+    />
+  );
 }

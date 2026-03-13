@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { UserSettingsProvider } from "@/components/layout/UserSettingsProvider";
 import { ThemeProvider } from "@/components/layout/ThemeProvider";
+import { createClient } from "@/lib/supabase/server";
+import { USER_SETTINGS_SELECT } from "@/lib/user-settings";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -33,11 +36,26 @@ export const viewport: Viewport = {
   themeColor: "#2563eb",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const initialSettings = user
+    ? (
+        await supabase
+          .from("user_settings")
+          .select(USER_SETTINGS_SELECT)
+          .eq("user_id", user.id)
+          .maybeSingle()
+      ).data
+    : null;
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -47,9 +65,11 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ThemeProvider>
-          {children}
-        </ThemeProvider>
+        <UserSettingsProvider initialSettings={initialSettings}>
+          <ThemeProvider>
+            {children}
+          </ThemeProvider>
+        </UserSettingsProvider>
         <script
           dangerouslySetInnerHTML={{
             __html: `

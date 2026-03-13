@@ -14,18 +14,66 @@ function toIdiomKey(value: string) {
   return normalizeLookupText(value).toLowerCase();
 }
 
+const READER_ALLOWED_TAGS = [
+  "a",
+  "article",
+  "aside",
+  "blockquote",
+  "br",
+  "code",
+  "div",
+  "em",
+  "figcaption",
+  "figure",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "hr",
+  "i",
+  "img",
+  "li",
+  "mark",
+  "ol",
+  "p",
+  "pre",
+  "section",
+  "span",
+  "strong",
+  "time",
+  "ul",
+];
+
+const READER_ALLOWED_ATTR = [
+  "alt",
+  "class",
+  "data-meaning",
+  "data-phrase",
+  "data-reader-collocation",
+  "data-reader-ignore-selection",
+  "data-reader-separator",
+  "data-type",
+  "data-word",
+  "height",
+  "href",
+  "loading",
+  "rel",
+  "sizes",
+  "src",
+  "srcset",
+  "target",
+  "title",
+  "width",
+];
+
 export function sanitizeReaderHtml(content: string) {
   return DOMPurify.sanitize(content, {
-    USE_PROFILES: { html: true },
-    ADD_ATTR: [
-      "data-meaning",
-      "data-phrase",
-      "data-reader-ignore-selection",
-      "data-type",
-      "data-word",
-      "data-reader-collocation",
-      "data-reader-separator",
-    ],
+    ALLOWED_TAGS: READER_ALLOWED_TAGS,
+    ALLOWED_ATTR: READER_ALLOWED_ATTR,
+    FORBID_TAGS: ["form", "iframe", "input", "object", "script", "style", "svg"],
+    FORBID_ATTR: ["onerror", "onload", "onclick", "style"],
   });
 }
 

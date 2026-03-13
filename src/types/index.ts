@@ -80,15 +80,18 @@ export interface ReviewEvent {
   reviewed_at: string;
 }
 
+export type ThemeMode = "light" | "dark" | "system";
 export type ReaderLookupStyle = "word" | "phrase";
 export type LookupMode = "vocab" | "sentence" | "paragraph";
 export type LookupIntent = "translate" | "explain";
 export type IdiomDetectionType = "idiom" | "phrasal_verb";
+export type UiLanguage = "en" | "th";
+export type TapBehavior = "word" | "sentence" | "off";
 
 export interface UserSettings {
   id: string;
   user_id: string;
-  theme: "light" | "dark" | "system";
+  theme: ThemeMode;
   font_size: number;
   line_spacing: number;
   review_goal?: number;
@@ -97,6 +100,9 @@ export interface UserSettings {
   onboarding_completed?: boolean;
   enable_offline?: boolean;
   reader_mode?: ReaderLookupStyle;
+  default_lookup_intent?: LookupIntent;
+  ui_language?: UiLanguage;
+  tap_behavior?: TapBehavior;
   updated_at: string;
 }
 

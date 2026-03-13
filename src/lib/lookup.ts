@@ -1,4 +1,5 @@
 import type { LookupIntent, LookupMode, ReaderLookupStyle } from "@/types";
+import { DEFAULT_USER_SETTINGS } from "@/lib/user-settings";
 
 export const WORD_SELECTION_MAX_LENGTH = 48;
 export const SMART_SELECTION_MAX_LENGTH = 900;
@@ -19,13 +20,11 @@ export function normalizeLookupStyle(value?: string | null): ReaderLookupStyle {
 }
 
 export function getStoredLookupStyle(): ReaderLookupStyle {
-  if (typeof window === "undefined") return "phrase";
-  return normalizeLookupStyle(localStorage.getItem("readerLookupMode"));
+  return DEFAULT_USER_SETTINGS.readerMode;
 }
 
 export function persistLookupStyle(style: ReaderLookupStyle) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem("readerLookupMode", style);
+  void style;
 }
 
 export function getSelectionMaxLength(style: ReaderLookupStyle) {

@@ -1,4 +1,5 @@
 import { extract, extractFromHtml } from "@extractus/article-extractor";
+import { sanitizeReaderHtml } from "@/lib/reader-html";
 import type { ExtractedArticle } from "@/types";
 
 function getFetchOptions(url: string) {
@@ -75,7 +76,7 @@ export async function extractArticle(
       author: article.author || null,
       published_at: article.published || null,
       image_url: article.image || null,
-      content: article.content,
+      content: sanitizeReaderHtml(article.content),
     };
   } catch (error) {
     console.error("Article extraction failed:", error);

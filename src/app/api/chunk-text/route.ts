@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { z } from "zod";
+import { guardAuthenticatedRequest, noStoreJson } from "@/lib/api-guard";
 import { chunkArticleText } from "@/lib/openai";
 
 const requestSchema = z.object({
@@ -9,8 +10,18 @@ const requestSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    const guard = await guardAuthenticatedRequest(request, {
+      routeId: "chunk-text",
+      limit: 12,
+      windowMs: 60_000,
+    });
+
+    if ("response" in guard) {
+      return guard.response;
+    }
+
     if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json(
+      return noStoreJson(
         { error: "OpenAI API key is not configured." },
         { status: 500 }
       );
@@ -20,17 +31,17 @@ export async function POST(request: NextRequest) {
     const parsed = requestSchema.safeParse(body);
 
     if (!parsed.success) {
-      return NextResponse.json(
+      return noStoreJson(
         { error: parsed.error.issues[0]?.message || "Invalid request body." },
         { status: 400 }
       );
     }
 
     const result = await chunkArticleText(parsed.data);
-    return NextResponse.json(result);
+    return noStoreJson(result);
   } catch (error) {
     console.error("Chunk text API error:", error);
-    return NextResponse.json(
+    return noStoreJson(
       { error: "Could not prepare chunked reading help right now." },
       { status: 500 }
     );

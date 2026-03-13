@@ -30,25 +30,34 @@ interface ReviewStateRow {
   interval_days: number;
   repetitions: number;
   next_review_at: string;
+  vocabulary_items:
+    | {
+        id: string;
+        word: string;
+        thai_meaning: string;
+        english_meaning: string;
+        part_of_speech: string;
+        vocabulary_contexts?: ReviewContextRow[] | null;
+      }
+    | {
+        id: string;
+        word: string;
+        thai_meaning: string;
+        english_meaning: string;
+        part_of_speech: string;
+        vocabulary_contexts?: ReviewContextRow[] | null;
+      }[]
+    | null;
+}
+
+interface ReviewContextRow {
+  original_sentence: string;
+  contextual_meaning: string;
+  created_at: string;
 }
 
 interface ReviewDayRow {
   reviewed_at: string;
-}
-
-interface ReviewVocabularyRow {
-  id: string;
-  word: string;
-  thai_meaning: string;
-  english_meaning: string;
-  part_of_speech: string;
-}
-
-interface ReviewContextRow {
-  vocabulary_item_id: string;
-  original_sentence: string;
-  contextual_meaning: string;
-  created_at: string;
 }
 
 function getStartOfToday() {
@@ -143,7 +152,9 @@ export default function ReviewPage() {
             .limit(45),
           supabase
             .from("review_states")
-            .select("id, vocabulary_item_id, ease_factor, interval_days, repetitions, next_review_at")
+            .select(
+              "id, vocabulary_item_id, ease_factor, interval_days, repetitions, next_review_at, vocabulary_items!inner(id, word, thai_meaning, english_meaning, part_of_speech, vocabulary_contexts(original_sentence, contextual_meaning, created_at))"
+            )
             .eq("user_id", user.id)
             .lte("next_review_at", new Date().toISOString())
             .order("next_review_at", { ascending: true })
@@ -164,40 +175,14 @@ export default function ReviewPage() {
         return;
       }
 
-      const typedReviewStates = reviewStates as ReviewStateRow[];
-      const vocabularyIds = typedReviewStates.map((item) => item.vocabulary_item_id);
-
-      const [{ data: vocabItems }, { data: contexts }] = await Promise.all([
-        supabase
-          .from("vocabulary_items")
-          .select("id, word, thai_meaning, english_meaning, part_of_speech")
-          .in("id", vocabularyIds),
-        supabase
-          .from("vocabulary_contexts")
-          .select("vocabulary_item_id, original_sentence, contextual_meaning, created_at")
-          .in("vocabulary_item_id", vocabularyIds)
-          .order("created_at", { ascending: false }),
-      ]);
-
-      const vocabMap = new Map(
-        ((vocabItems ?? []) as ReviewVocabularyRow[]).map((item) => [item.id, item])
-      );
-      const contextMap = new Map<string, { original_sentence: string; contextual_meaning: string }>();
-
-      for (const context of (contexts ?? []) as ReviewContextRow[]) {
-        if (!contextMap.has(context.vocabulary_item_id)) {
-          contextMap.set(context.vocabulary_item_id, {
-            original_sentence: context.original_sentence || "",
-            contextual_meaning: context.contextual_meaning || "",
-          });
-        }
-      }
-
-      const reviewCards: ReviewCard[] = typedReviewStates.flatMap((reviewState) => {
-        const vocabItem = vocabMap.get(reviewState.vocabulary_item_id);
+      const reviewCards: ReviewCard[] = (reviewStates as ReviewStateRow[]).flatMap((reviewState) => {
+        const vocabItem = Array.isArray(reviewState.vocabulary_items)
+          ? reviewState.vocabulary_items[0]
+          : reviewState.vocabulary_items;
         if (!vocabItem) return [];
 
-        const context = contextMap.get(reviewState.vocabulary_item_id);
+        const latestContext = [...(vocabItem.vocabulary_contexts ?? [])]
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
 
         return [
           {
@@ -206,8 +191,8 @@ export default function ReviewPage() {
             thai_meaning: vocabItem.thai_meaning,
             english_meaning: vocabItem.english_meaning,
             part_of_speech: vocabItem.part_of_speech,
-            example_sentence: context?.original_sentence || "",
-            contextual_meaning: context?.contextual_meaning || "",
+            example_sentence: latestContext?.original_sentence || "",
+            contextual_meaning: latestContext?.contextual_meaning || "",
             ease_factor: reviewState.ease_factor,
             interval_days: reviewState.interval_days,
             repetitions: reviewState.repetitions,

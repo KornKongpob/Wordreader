@@ -1,23 +1,22 @@
 "use client";
 
 import Image from "next/image";
-import { startTransition, useDeferredValue, useEffect, useRef, useState } from "react";
+import { startTransition, useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
 import { BookMarked, ExternalLink, Loader2, RotateCcw } from "lucide-react";
 import ProfileBootstrap from "@/components/layout/ProfileBootstrap";
+import { useUserSettings } from "@/components/layout/UserSettingsProvider";
 import ArticleNotes from "./ArticleNotes";
 import ArticleQuiz from "./ArticleQuiz";
 import ReaderControls from "./ReaderControls";
 import SavedWordPopup from "./SavedWordPopup";
 import SelectionActionBar from "./SelectionActionBar";
-import SentencePopup from "./SentencePopup";
 import VocabPopup from "./VocabPopup";
 import { useTextSelection } from "@/hooks/useTextSelection";
 import {
+  createLookupCacheKey,
   getSelectionMaxLength,
-  getStoredLookupStyle,
   inferLookupMode,
   normalizeLookupText,
-  persistLookupStyle,
   type LookupRequest,
 } from "@/lib/lookup";
 import { getOfflineVocabulary, saveOfflineArticle } from "@/lib/offline";
@@ -36,17 +35,10 @@ import type {
   LookupResult,
   ReaderLookupStyle,
   SavedVocabularyPreview,
-  SentenceAnalysisResult,
 } from "@/types";
 
 interface ReaderViewProps {
   article: Article;
-}
-
-interface SentenceLookupRequest {
-  text: string;
-  sentence: string;
-  paragraph: string;
 }
 
 interface IdiomTooltipState extends DetectedIdiom {
@@ -55,27 +47,13 @@ interface IdiomTooltipState extends DetectedIdiom {
   placement: "top" | "bottom";
 }
 
-function getStoredFontSize() {
-  if (typeof window === "undefined") return 18;
-  const savedFontSize = localStorage.getItem("readerFontSize");
-  return savedFontSize ? parseInt(savedFontSize, 10) : 18;
-}
-
-function getStoredLineSpacing() {
-  if (typeof window === "undefined") return 1.6;
-  const savedLineSpacing = localStorage.getItem("readerLineSpacing");
-  return savedLineSpacing ? parseFloat(savedLineSpacing) : 1.6;
-}
-
 function createSavedVocabularyMap(items: SavedVocabularyPreview[]) {
   return new Map(items.map((item) => [toSavedWordKey(item.word), item]));
 }
 
 export default function ReaderView({ article }: ReaderViewProps) {
   const supabase = createClient();
-  const [fontSize, setFontSize] = useState(getStoredFontSize);
-  const [lineSpacing, setLineSpacing] = useState(getStoredLineSpacing);
-  const [lookupMode, setLookupMode] = useState<ReaderLookupStyle>(getStoredLookupStyle);
+  const { settings, updateSettings } = useUserSettings();
   const [savedVocabulary, setSavedVocabulary] = useState<SavedVocabularyPreview[]>([]);
   const [renderedContent, setRenderedContent] = useState(() =>
     sanitizeReaderHtml(article.content)
@@ -84,7 +62,6 @@ export default function ReaderView({ article }: ReaderViewProps) {
   const [readingProgress, setReadingProgress] = useState(0);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const [lookupRequest, setLookupRequest] = useState<LookupRequest | null>(null);
-  const [sentenceLookup, setSentenceLookup] = useState<SentenceLookupRequest | null>(null);
   const [savedWordPreview, setSavedWordPreview] = useState<SavedVocabularyPreview | null>(null);
   const [readingHelperEnabled, setReadingHelperEnabled] = useState(false);
   const [chunkedContent, setChunkedContent] = useState<string | null>(null);
@@ -95,6 +72,8 @@ export default function ReaderView({ article }: ReaderViewProps) {
   const [idiomError, setIdiomError] = useState<string | null>(null);
   const [idiomScanCompleted, setIdiomScanCompleted] = useState(false);
   const [idiomTooltip, setIdiomTooltip] = useState<IdiomTooltipState | null>(null);
+  const [quickSaveLoading, setQuickSaveLoading] = useState(false);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const notesRef = useRef<HTMLDivElement>(null);
@@ -104,16 +83,19 @@ export default function ReaderView({ article }: ReaderViewProps) {
   const progressRef = useRef(0);
   const lookupCacheRef = useRef<Map<string, LookupResult>>(new Map());
   const savedVocabularyMapRef = useRef<Map<string, SavedVocabularyPreview>>(new Map());
-  const sentenceAnalysisCacheRef = useRef<Map<string, SentenceAnalysisResult>>(new Map());
   const chunkedContentCacheRef = useRef<Map<string, string>>(new Map());
   const idiomCacheRef = useRef<Map<string, DetectedIdiom[]>>(new Map());
   const idiomRequestRef = useRef<AbortController | null>(null);
   const deferredSavedVocabulary = useDeferredValue(savedVocabulary);
 
+  const fontSize = settings.fontSize;
+  const lineSpacing = settings.lineSpacing;
+  const lookupMode = settings.readerMode;
   const selectionMaxLength = getSelectionMaxLength(lookupMode);
 
   const { selection, clearSelection, selectionNotice } = useTextSelection(contentRef, {
     maxLength: selectionMaxLength,
+    tapBehavior: settings.tapBehavior,
   });
 
   const applySavedVocabulary = (items: SavedVocabularyPreview[]) => {
@@ -139,11 +121,6 @@ export default function ReaderView({ article }: ReaderViewProps) {
   }, [lookupRequest]);
 
   useEffect(() => {
-    if (!sentenceLookup) return;
-    latestSelectionRef.current = sentenceLookup.sentence;
-  }, [sentenceLookup]);
-
-  useEffect(() => {
     const cachedChunkedContent = chunkedContentCacheRef.current.get(article.id) ?? null;
     const cachedIdioms = idiomCacheRef.current.get(article.id);
 
@@ -157,7 +134,6 @@ export default function ReaderView({ article }: ReaderViewProps) {
     setIdiomError(null);
     setIdiomTooltip(null);
     setLookupRequest(null);
-    setSentenceLookup(null);
     setSavedWordPreview(null);
   }, [article.content, article.id]);
 
@@ -180,7 +156,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
     const loadReaderContext = async () => {
       if (!supabase) return;
 
-      let shouldCacheOffline = true;
+      const shouldCacheOffline = settings.enableOffline;
       const { user, error: userError } = await getUserWithProfile(supabase);
 
       if (!user) {
@@ -214,12 +190,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
       setSyncNotice(null);
       userIdRef.current = user.id;
 
-      const [{ data: settings }, { data: vocabItems }, { data: history }] = await Promise.all([
-        supabase
-          .from("user_settings")
-          .select("font_size, line_spacing, reader_mode, enable_offline")
-          .eq("user_id", user.id)
-          .maybeSingle(),
+      const [{ data: vocabItems }, { data: history }] = await Promise.all([
         supabase
           .from("vocabulary_items")
           .select(
@@ -233,25 +204,6 @@ export default function ReaderView({ article }: ReaderViewProps) {
           .eq("article_id", article.id)
           .maybeSingle(),
       ]);
-
-      if (settings?.font_size) {
-        setFontSize(settings.font_size);
-        localStorage.setItem("readerFontSize", settings.font_size.toString());
-      }
-
-      if (settings?.line_spacing) {
-        setLineSpacing(settings.line_spacing);
-        localStorage.setItem("readerLineSpacing", settings.line_spacing.toString());
-      }
-
-      if (settings?.reader_mode === "word" || settings?.reader_mode === "phrase") {
-        setLookupMode(settings.reader_mode);
-        persistLookupStyle(settings.reader_mode);
-      }
-
-      if (settings?.enable_offline === false) {
-        shouldCacheOffline = false;
-      }
 
       if (vocabItems) {
         applySavedVocabulary(vocabItems as SavedVocabularyPreview[]);
@@ -301,6 +253,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
     article.source_name,
     article.title,
     article.url,
+    settings.enableOffline,
     supabase,
   ]);
 
@@ -482,7 +435,6 @@ export default function ReaderView({ article }: ReaderViewProps) {
         setIdiomTooltip({ phrase, meaning, type, x, y, placement });
         setSavedWordPreview(null);
         setLookupRequest(null);
-        setSentenceLookup(null);
         clearSelection();
         return true;
       }
@@ -544,7 +496,6 @@ export default function ReaderView({ article }: ReaderViewProps) {
 
       setSavedWordPreview(item);
       setLookupRequest(null);
-      setSentenceLookup(null);
       clearSelection();
     };
 
@@ -578,19 +529,6 @@ export default function ReaderView({ article }: ReaderViewProps) {
     };
   }, []);
 
-  const persistSetting = async (values: Record<string, unknown>) => {
-    const userId = userIdRef.current;
-    if (!supabase || !userId) return;
-
-    await supabase.from("user_settings").upsert(
-      {
-        user_id: userId,
-        ...values,
-      },
-      { onConflict: "user_id" }
-    );
-  };
-
   const formattedDate = article.published_at
     ? new Date(article.published_at).toLocaleDateString("en-US", {
         year: "numeric",
@@ -600,21 +538,15 @@ export default function ReaderView({ article }: ReaderViewProps) {
     : null;
 
   const handleFontSizeChange = (size: number) => {
-    setFontSize(size);
-    localStorage.setItem("readerFontSize", size.toString());
-    void persistSetting({ font_size: size });
+    void updateSettings({ fontSize: size });
   };
 
   const handleLineSpacingChange = (spacing: number) => {
-    setLineSpacing(spacing);
-    localStorage.setItem("readerLineSpacing", spacing.toString());
-    void persistSetting({ line_spacing: spacing });
+    void updateSettings({ lineSpacing: spacing });
   };
 
   const handleLookupModeChange = (mode: ReaderLookupStyle) => {
-    setLookupMode(mode);
-    persistLookupStyle(mode);
-    void persistSetting({ reader_mode: mode });
+    void updateSettings({ readerMode: mode });
   };
 
   const handleResume = () => {
@@ -640,35 +572,106 @@ export default function ReaderView({ article }: ReaderViewProps) {
     applySavedVocabulary(nextItems);
   };
 
-  const handleLookupAction = (intent: LookupIntent) => {
-    if (!selection) return;
-
-    if (selection.kind === "sentence" && lookupMode !== "word") {
-      setIdiomTooltip(null);
-      setSavedWordPreview(null);
-      setLookupRequest(null);
-      setSentenceLookup({
-        text: selection.text,
-        sentence: selection.sentence,
-        paragraph: selection.paragraph,
-      });
-      clearSelection();
-      return;
-    }
-
-    const mode = inferLookupMode(selection, lookupMode);
+  const openLookupForSelection = useCallback((
+    nextSelection: NonNullable<typeof selection>,
+    intent: LookupIntent
+  ) => {
+    const mode = inferLookupMode(nextSelection, lookupMode);
+    setActionNotice(null);
     setIdiomTooltip(null);
     setSavedWordPreview(null);
-    setSentenceLookup(null);
     setLookupRequest({
-      text: selection.text,
-      sentence: selection.sentence,
-      paragraph: selection.paragraph,
+      text: nextSelection.text,
+      sentence: nextSelection.sentence,
+      paragraph: nextSelection.paragraph,
       mode,
       intent,
     });
+  }, [lookupMode]);
+
+  const handleLookupAction = (intent: LookupIntent) => {
+    if (!selection) return;
+    openLookupForSelection(selection, intent);
     clearSelection();
   };
+
+  const handleQuickSave = async () => {
+    if (!selection) return;
+
+    const mode = inferLookupMode(selection, lookupMode);
+    if (mode !== "vocab") {
+      handleLookupAction(settings.defaultLookupIntent);
+      return;
+    }
+
+    setQuickSaveLoading(true);
+    setActionNotice(null);
+
+    try {
+      const response = await fetch("/api/vocabulary/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          articleId: article.id,
+          articleTitle: article.title,
+          articleSourceName: article.source_name,
+          text: selection.text,
+          sentence: selection.sentence,
+          paragraph: selection.paragraph,
+        }),
+      });
+
+      const data = (await response.json()) as {
+        error?: string;
+        item?: SavedVocabularyPreview;
+        lookup?: LookupResult;
+      };
+
+      if (!response.ok || !data.item || !data.lookup || data.lookup.type !== "vocab") {
+        setActionNotice(data.error || "Could not save this word right now.");
+        return;
+      }
+
+      lookupCacheRef.current.set(
+        createLookupCacheKey(article.id, {
+          text: selection.text,
+          sentence: selection.sentence,
+          paragraph: selection.paragraph,
+          mode: "vocab",
+          intent: "translate",
+        }),
+        data.lookup
+      );
+
+      handleWordSaved(data.item);
+      setSavedWordPreview(data.item);
+      clearSelection();
+    } catch (error) {
+      console.error("Quick save failed:", error);
+      setActionNotice("Could not save this word right now.");
+    } finally {
+      setQuickSaveLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selection || selection.trigger === "selection") {
+      return;
+    }
+
+    setActionNotice(null);
+    const mode = inferLookupMode(selection, lookupMode);
+    const nextIntent: LookupIntent = mode === "vocab" ? "translate" : settings.defaultLookupIntent;
+
+    openLookupForSelection(selection, nextIntent);
+    clearSelection();
+  }, [
+    clearSelection,
+    lookupMode,
+    openLookupForSelection,
+    selection,
+    settings.defaultLookupIntent,
+  ]);
 
   const handleReadingHelperToggle = (enabled: boolean) => {
     setReadingHelperEnabled(enabled);
@@ -738,13 +741,29 @@ export default function ReaderView({ article }: ReaderViewProps) {
           ? "paragraph"
           : inferLookupMode(selection, lookupMode)
     : null;
+  const primarySelectionIntent: LookupIntent =
+    activeSelectionMode && activeSelectionMode !== "vocab"
+      ? settings.defaultLookupIntent
+      : "translate";
+  const secondarySelectionIntent =
+    activeSelectionMode && activeSelectionMode !== "vocab"
+      ? primarySelectionIntent === "translate"
+        ? "explain"
+        : "translate"
+      : null;
   const selectionPrimaryLabel =
-    selection?.kind === "sentence" && lookupMode !== "word" ? "Look up" : "Translate";
-  const showExplainAction =
-    selection &&
-    selection.kind !== "sentence" &&
-    activeSelectionMode !== null &&
-    activeSelectionMode !== "vocab";
+    primarySelectionIntent === "translate" ? "Translate" : "Explain";
+  const selectionSecondaryLabel =
+    secondarySelectionIntent === "translate"
+      ? "Translate"
+      : secondarySelectionIntent === "explain"
+        ? "Explain"
+        : undefined;
+  const showQuickSave =
+    Boolean(selection) &&
+    activeSelectionMode === "vocab" &&
+    !lookupRequest &&
+    !savedWordPreview;
 
   return (
     <div className="h-dvh flex flex-col overflow-hidden">
@@ -943,7 +962,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
         </div>
       )}
 
-      {!selection && selectionNotice && !lookupRequest && !sentenceLookup && !savedWordPreview && (
+      {!selection && selectionNotice && !lookupRequest && !savedWordPreview && (
         <div className="fixed bottom-0 left-0 right-0 z-30 pb-safe">
           <div className="mx-auto max-w-lg px-4 pb-4">
             <div className="glass-panel text-safe-body rounded-xl px-4 py-3 text-sm text-warning">
@@ -953,35 +972,41 @@ export default function ReaderView({ article }: ReaderViewProps) {
         </div>
       )}
 
-      {selection && activeSelectionMode && !lookupRequest && !sentenceLookup && !savedWordPreview && (
+      {!selection && actionNotice && !lookupRequest && !savedWordPreview && (
+        <div className="fixed bottom-0 left-0 right-0 z-30 pb-safe">
+          <div className="mx-auto max-w-lg px-4 pb-4">
+            <div className="glass-panel text-safe-body rounded-xl px-4 py-3 text-sm text-danger">
+              {actionNotice}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selection && activeSelectionMode && !lookupRequest && !savedWordPreview && (
         <SelectionActionBar
           text={selection.text}
           mode={activeSelectionMode}
           primaryLabel={selectionPrimaryLabel}
-          onTranslate={() => handleLookupAction("translate")}
-          onExplain={showExplainAction ? () => handleLookupAction("explain") : undefined}
+          onPrimaryAction={() => handleLookupAction(primarySelectionIntent)}
+          secondaryLabel={selectionSecondaryLabel}
+          onSecondaryAction={
+            secondarySelectionIntent ? () => handleLookupAction(secondarySelectionIntent) : undefined
+          }
+          onQuickSave={showQuickSave ? () => void handleQuickSave() : undefined}
+          quickSaveBusy={quickSaveLoading}
+          notice={actionNotice}
           onDismiss={clearSelection}
         />
       )}
 
-      {savedWordPreview && !lookupRequest && !sentenceLookup && (
+      {savedWordPreview && !lookupRequest && (
         <SavedWordPopup
           item={savedWordPreview}
           onClose={() => setSavedWordPreview(null)}
         />
       )}
 
-      {sentenceLookup && !lookupRequest && (
-        <SentencePopup
-          selection={sentenceLookup}
-          articleId={article.id}
-          articleTitle={article.title}
-          cacheRef={sentenceAnalysisCacheRef}
-          onClose={() => setSentenceLookup(null)}
-        />
-      )}
-
-      {lookupRequest && !sentenceLookup && (
+      {lookupRequest && (
         <VocabPopup
           lookup={lookupRequest}
           articleId={article.id}

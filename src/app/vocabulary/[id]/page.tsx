@@ -40,12 +40,20 @@ interface VocabContext {
   contextual_meaning: string;
   context_explanation: string;
   created_at: string;
-  article: {
-    id: string;
-    title: string;
-    url: string;
-    source_name: string;
-  } | null;
+  article:
+    | {
+        id: string;
+        title: string;
+        url: string;
+        source_name: string;
+      }
+    | {
+        id: string;
+        title: string;
+        url: string;
+        source_name: string;
+      }[]
+    | null;
 }
 
 interface ReviewState {
@@ -57,22 +65,6 @@ interface ReviewState {
 interface ReviewEventItem {
   rating: "again" | "easy" | "medium" | "hard";
   reviewed_at: string;
-}
-
-interface ContextRow {
-  id: string;
-  original_sentence: string;
-  contextual_meaning: string;
-  context_explanation: string;
-  created_at: string;
-  article_id: string;
-}
-
-interface ArticleSummary {
-  id: string;
-  title: string;
-  url: string;
-  source_name: string;
 }
 
 export default function VocabularyDetailPage() {
@@ -125,33 +117,13 @@ export default function VocabularyDetailPage() {
       const { data: contextData } = await supabase
         .from("vocabulary_contexts")
         .select(
-          "id, original_sentence, contextual_meaning, context_explanation, created_at, article_id"
+          "id, original_sentence, contextual_meaning, context_explanation, created_at, article:articles(id, title, url, source_name)"
         )
         .eq("vocabulary_item_id", id)
         .order("created_at", { ascending: false });
 
       if (contextData) {
-        const contextRows = contextData as ContextRow[];
-        const articleIds = [...new Set(contextRows.map((contextRow) => contextRow.article_id))];
-        let articleMap = new Map<string, ArticleSummary>();
-
-        if (articleIds.length > 0) {
-          const { data: articleRows } = await supabase
-            .from("articles")
-            .select("id, title, url, source_name")
-            .in("id", articleIds);
-
-          articleMap = new Map(
-            ((articleRows ?? []) as ArticleSummary[]).map((article) => [article.id, article])
-          );
-        }
-
-        setContexts(
-          contextRows.map((contextRow) => ({
-            ...contextRow,
-            article: articleMap.get(contextRow.article_id) ?? null,
-          }))
-        );
+        setContexts(contextData as VocabContext[]);
       }
 
       if (user) {
@@ -481,49 +453,55 @@ export default function VocabularyDetailPage() {
           <section>
             <h2 className="editorial-label mb-3">Contexts ({contexts.length})</h2>
             <div className="space-y-3">
-              {contexts.map((context) => (
-                <div
-                  key={context.id}
-                  className="glass-panel space-y-3 rounded-[1.75rem] p-4"
-                >
-                  <p className="text-safe-body text-sm italic">
-                    &ldquo;{context.original_sentence}&rdquo;
-                  </p>
-                  {context.contextual_meaning && (
-                    <p className="text-sm text-muted">
-                      <strong className="text-foreground">Meaning here:</strong>{" "}
-                      {context.contextual_meaning}
+              {contexts.map((context) => {
+                const article = Array.isArray(context.article)
+                  ? context.article[0]
+                  : context.article;
+
+                return (
+                  <div
+                    key={context.id}
+                    className="glass-panel space-y-3 rounded-[1.75rem] p-4"
+                  >
+                    <p className="text-safe-body text-sm italic">
+                      &ldquo;{context.original_sentence}&rdquo;
                     </p>
-                  )}
-                  {context.context_explanation && (
-                    <p className="text-safe-meta text-xs text-muted">
-                      {context.context_explanation}
-                    </p>
-                  )}
-                  {context.article && (
-                    <div className="flex flex-wrap items-center gap-2 pt-1">
-                      <Link
-                        href={`/read/${context.article.id}`}
-                        className="glass-chip max-w-full rounded-full px-3 py-1.5 text-xs text-primary transition hover:text-foreground sm:max-w-[70%]"
-                      >
-                        <span className="chip-truncate">{context.article.title}</span>
-                      </Link>
-                      <span className="glass-chip rounded-full px-3 py-1.5 text-xs text-muted">
-                        {context.article.source_name}
-                      </span>
-                      <a
-                        href={context.article.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="glass-chip rounded-full px-2 py-2 text-muted transition hover:text-primary"
-                        aria-label="Open original article"
-                      >
-                        <ExternalLink size={10} />
-                      </a>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    {context.contextual_meaning && (
+                      <p className="text-sm text-muted">
+                        <strong className="text-foreground">Meaning here:</strong>{" "}
+                        {context.contextual_meaning}
+                      </p>
+                    )}
+                    {context.context_explanation && (
+                      <p className="text-safe-meta text-xs text-muted">
+                        {context.context_explanation}
+                      </p>
+                    )}
+                    {article && (
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        <Link
+                          href={`/read/${article.id}`}
+                          className="glass-chip max-w-full rounded-full px-3 py-1.5 text-xs text-primary transition hover:text-foreground sm:max-w-[70%]"
+                        >
+                          <span className="chip-truncate">{article.title}</span>
+                        </Link>
+                        <span className="glass-chip rounded-full px-3 py-1.5 text-xs text-muted">
+                          {article.source_name}
+                        </span>
+                        <a
+                          href={article.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="glass-chip rounded-full px-2 py-2 text-muted transition hover:text-primary"
+                          aria-label="Open original article"
+                        >
+                          <ExternalLink size={10} />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </section>
         )}

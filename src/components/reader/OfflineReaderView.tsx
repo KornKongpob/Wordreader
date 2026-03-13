@@ -1,34 +1,21 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
 import { CloudOff, ExternalLink } from "lucide-react";
+import { useUserSettings } from "@/components/layout/UserSettingsProvider";
 import ReaderControls from "./ReaderControls";
-import { getStoredLookupStyle, persistLookupStyle } from "@/lib/lookup";
 import type { OfflineArticleRecord } from "@/lib/offline";
 import { getPlainTextFromHtml, sanitizeReaderHtml } from "@/lib/reader-html";
-import type { ReaderLookupStyle } from "@/types";
 
 interface OfflineReaderViewProps {
   article: OfflineArticleRecord;
 }
 
-function getStoredFontSize() {
-  if (typeof window === "undefined") return 18;
-  const savedFontSize = localStorage.getItem("readerFontSize");
-  return savedFontSize ? parseInt(savedFontSize, 10) : 18;
-}
-
-function getStoredLineSpacing() {
-  if (typeof window === "undefined") return 1.6;
-  const savedLineSpacing = localStorage.getItem("readerLineSpacing");
-  return savedLineSpacing ? parseFloat(savedLineSpacing) : 1.6;
-}
-
 export default function OfflineReaderView({ article }: OfflineReaderViewProps) {
-  const [fontSize, setFontSize] = useState(getStoredFontSize);
-  const [lineSpacing, setLineSpacing] = useState(getStoredLineSpacing);
-  const [lookupMode, setLookupMode] = useState<ReaderLookupStyle>(getStoredLookupStyle);
+  const { settings, updateSettings } = useUserSettings();
+  const fontSize = settings.fontSize;
+  const lineSpacing = settings.lineSpacing;
+  const lookupMode = settings.readerMode;
   const plainArticleText = getPlainTextFromHtml(article.content);
   const renderedContent = sanitizeReaderHtml(article.content);
 
@@ -41,18 +28,15 @@ export default function OfflineReaderView({ article }: OfflineReaderViewProps) {
     : null;
 
   const handleFontSizeChange = (size: number) => {
-    setFontSize(size);
-    localStorage.setItem("readerFontSize", size.toString());
+    void updateSettings({ fontSize: size });
   };
 
   const handleLineSpacingChange = (spacing: number) => {
-    setLineSpacing(spacing);
-    localStorage.setItem("readerLineSpacing", spacing.toString());
+    void updateSettings({ lineSpacing: spacing });
   };
 
-  const handleLookupModeChange = (mode: ReaderLookupStyle) => {
-    setLookupMode(mode);
-    persistLookupStyle(mode);
+  const handleLookupModeChange = (mode: typeof lookupMode) => {
+    void updateSettings({ readerMode: mode });
   };
 
   return (

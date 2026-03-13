@@ -1,13 +1,12 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-
-type Theme = "light" | "dark" | "system";
+import { useUserSettings } from "@/components/layout/UserSettingsProvider";
+import type { ThemeMode } from "@/types";
 
 interface ThemeContextType {
-  theme: Theme;
-  setTheme: (theme: Theme) => void;
+  theme: ThemeMode;
+  setTheme: (theme: ThemeMode) => void;
   resolvedTheme: "light" | "dark";
 }
 
@@ -17,48 +16,14 @@ const ThemeContext = createContext<ThemeContextType>({
   resolvedTheme: "light",
 });
 
-function getStoredTheme(): Theme {
-  if (typeof window === "undefined") return "system";
-
-  const stored = localStorage.getItem("theme");
-  return stored === "light" || stored === "dark" || stored === "system"
-    ? stored
-    : "system";
-}
-
 export function useTheme() {
   return useContext(ThemeContext);
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(getStoredTheme);
+  const { settings, updateSettings } = useUserSettings();
   const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
-
-  useEffect(() => {
-    const syncRemoteTheme = async () => {
-      const supabase = createClient();
-      if (!supabase) return;
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) return;
-
-      const { data } = await supabase
-        .from("user_settings")
-        .select("theme")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (data?.theme === "light" || data?.theme === "dark" || data?.theme === "system") {
-        setThemeState(data.theme);
-        localStorage.setItem("theme", data.theme);
-      }
-    };
-
-    void syncRemoteTheme();
-  }, []);
+  const theme = settings.theme;
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
@@ -75,27 +40,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return () => mediaQuery.removeEventListener("change", resolve);
   }, [theme]);
 
-  const setTheme = (newTheme: Theme) => {
-    setThemeState(newTheme);
-    localStorage.setItem("theme", newTheme);
-    const supabase = createClient();
-    if (!supabase) return;
-
-    void (async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) return;
-
-      void supabase.from("user_settings").upsert(
-        {
-          user_id: user.id,
-          theme: newTheme,
-        },
-        { onConflict: "user_id" }
-      );
-    })();
+  const setTheme = (newTheme: ThemeMode) => {
+    void updateSettings({ theme: newTheme });
   };
 
   return (

@@ -1,15 +1,19 @@
 "use client";
 
-import { Languages, Sparkles, X } from "lucide-react";
+import { BookmarkPlus, Languages, Loader2, Sparkles, X } from "lucide-react";
 import type { LookupMode } from "@/types";
 
 interface SelectionActionBarProps {
   text: string;
   mode: LookupMode;
-  onTranslate: () => void;
-  onExplain?: () => void;
+  primaryLabel: string;
+  onPrimaryAction: () => void;
+  secondaryLabel?: string;
+  onSecondaryAction?: () => void;
+  onQuickSave?: () => void;
+  quickSaveBusy?: boolean;
+  notice?: string | null;
   onDismiss: () => void;
-  primaryLabel?: string;
 }
 
 function getModeLabel(mode: LookupMode) {
@@ -21,11 +25,18 @@ function getModeLabel(mode: LookupMode) {
 export default function SelectionActionBar({
   text,
   mode,
-  onTranslate,
-  onExplain,
+  primaryLabel,
+  onPrimaryAction,
+  secondaryLabel,
+  onSecondaryAction,
+  onQuickSave,
+  quickSaveBusy = false,
+  notice,
   onDismiss,
-  primaryLabel = "Translate",
 }: SelectionActionBarProps) {
+  const gridColumns =
+    onQuickSave && onSecondaryAction ? "sm:grid-cols-3" : "sm:grid-cols-2";
+
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 pb-safe">
       <div className="mx-auto max-w-lg px-4 pb-4">
@@ -50,27 +61,45 @@ export default function SelectionActionBar({
             </button>
           </div>
 
-          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className={`mt-3 grid grid-cols-1 gap-2 ${gridColumns}`}>
             <button
               type="button"
-              onClick={onTranslate}
+              onClick={onPrimaryAction}
               className="glow-button inline-flex min-h-[3.25rem] items-center justify-center gap-2 rounded-xl px-3 py-3 text-center text-sm font-medium text-primary-foreground"
             >
               <Languages size={16} />
               {primaryLabel}
             </button>
 
-            {mode !== "vocab" && onExplain ? (
+            {onSecondaryAction && secondaryLabel ? (
               <button
                 type="button"
-                onClick={onExplain}
+                onClick={onSecondaryAction}
                 className="subtle-button inline-flex min-h-[3.25rem] items-center justify-center gap-2 rounded-xl px-3 py-3 text-center text-sm font-medium text-foreground"
               >
                 <Sparkles size={16} />
-                Explain
+                {secondaryLabel}
+              </button>
+            ) : null}
+
+            {onQuickSave ? (
+              <button
+                type="button"
+                onClick={onQuickSave}
+                disabled={quickSaveBusy}
+                className="subtle-button inline-flex min-h-[3.25rem] items-center justify-center gap-2 rounded-xl px-3 py-3 text-center text-sm font-medium text-foreground disabled:opacity-60"
+              >
+                {quickSaveBusy ? <Loader2 size={16} className="animate-spin" /> : <BookmarkPlus size={16} />}
+                {quickSaveBusy ? "Saving..." : "Quick save"}
               </button>
             ) : null}
           </div>
+
+          {notice ? (
+            <p className="mt-3 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">
+              {notice}
+            </p>
+          ) : null}
         </div>
       </div>
     </div>
