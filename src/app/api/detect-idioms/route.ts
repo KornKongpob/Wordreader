@@ -3,6 +3,9 @@ import { z } from "zod";
 import { guardAuthenticatedRequest, noStoreJson } from "@/lib/api-guard";
 import { detectIdioms } from "@/lib/openai";
 
+export const runtime = "nodejs";
+export const maxDuration = 30;
+
 const requestSchema = z.object({
   content: z.string().min(1, "Please provide article HTML content."),
   articleTitle: z.string().trim().optional(),

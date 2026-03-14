@@ -1,10 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
-import { sanitizeReaderHtml } from "@/lib/reader-html";
+import { sanitizeReaderHtmlForServer } from "@/lib/reader-html-server";
 import { notFound } from "next/navigation";
 import ReaderView from "@/components/reader/ReaderView";
 import type { Article } from "@/types";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -28,7 +29,7 @@ export default async function ReaderPage({ params }: PageProps) {
     <ReaderView
       article={{
         ...(article as Article),
-        content: sanitizeReaderHtml((article as Article).content),
+        content: sanitizeReaderHtmlForServer((article as Article).content),
       }}
     />
   );

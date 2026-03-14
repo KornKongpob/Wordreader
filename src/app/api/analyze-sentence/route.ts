@@ -3,6 +3,9 @@ import { z } from "zod";
 import { guardAuthenticatedRequest, noStoreJson } from "@/lib/api-guard";
 import { analyzeSentence } from "@/lib/openai";
 
+export const runtime = "nodejs";
+export const maxDuration = 30;
+
 const requestSchema = z.object({
   sentence: z.string().trim().min(1, "Please provide a sentence to analyze."),
   paragraph: z.string().trim().optional(),

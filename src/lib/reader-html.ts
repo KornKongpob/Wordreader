@@ -1,5 +1,12 @@
-import DOMPurify from "isomorphic-dompurify";
 import { normalizeLookupText } from "@/lib/lookup";
+import {
+  READER_ALLOWED_ATTR,
+  READER_ALLOWED_TAGS,
+  READER_FORBIDDEN_TAGS,
+  sanitizeDimensionValue,
+  sanitizeSrcSetValue,
+  sanitizeUrlValue,
+} from "@/lib/reader-html-config";
 import type { DetectedIdiom, SavedVocabularyPreview } from "@/types";
 
 function escapeRegex(value: string) {
@@ -14,67 +21,102 @@ function toIdiomKey(value: string) {
   return normalizeLookupText(value).toLowerCase();
 }
 
-const READER_ALLOWED_TAGS = [
-  "a",
-  "article",
-  "aside",
-  "blockquote",
-  "br",
-  "code",
-  "div",
-  "em",
-  "figcaption",
-  "figure",
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "h5",
-  "h6",
-  "hr",
-  "i",
-  "img",
-  "li",
-  "mark",
-  "ol",
-  "p",
-  "pre",
-  "section",
-  "span",
-  "strong",
-  "time",
-  "ul",
-];
-
-const READER_ALLOWED_ATTR = [
-  "alt",
-  "class",
-  "data-meaning",
-  "data-phrase",
-  "data-reader-collocation",
-  "data-reader-ignore-selection",
-  "data-reader-separator",
-  "data-type",
-  "data-word",
-  "height",
-  "href",
-  "loading",
-  "rel",
-  "sizes",
-  "src",
-  "srcset",
-  "target",
-  "title",
-  "width",
-];
+const ALLOWED_TAG_SET = new Set(READER_ALLOWED_TAGS);
+const ALLOWED_ATTR_SET = new Set(READER_ALLOWED_ATTR);
+const FORBIDDEN_TAG_SET = new Set(READER_FORBIDDEN_TAGS);
 
 export function sanitizeReaderHtml(content: string) {
-  return DOMPurify.sanitize(content, {
-    ALLOWED_TAGS: READER_ALLOWED_TAGS,
-    ALLOWED_ATTR: READER_ALLOWED_ATTR,
-    FORBID_TAGS: ["form", "iframe", "input", "object", "script", "style", "svg"],
-    FORBID_ATTR: ["onerror", "onload", "onclick", "style"],
-  });
+  if (typeof DOMParser === "undefined") {
+    return content;
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(`<div id="reader-root">${content || ""}</div>`, "text/html");
+  const root = doc.getElementById("reader-root");
+  if (!root) return "";
+
+  const elements = [...root.querySelectorAll("*")];
+  for (const element of elements) {
+    const tagName = element.tagName.toLowerCase();
+
+    if (FORBIDDEN_TAG_SET.has(tagName as (typeof READER_FORBIDDEN_TAGS)[number])) {
+      element.remove();
+      continue;
+    }
+
+    if (!ALLOWED_TAG_SET.has(tagName as (typeof READER_ALLOWED_TAGS)[number])) {
+      element.replaceWith(...Array.from(element.childNodes));
+      continue;
+    }
+
+    for (const attribute of [...element.attributes]) {
+      const name = attribute.name.toLowerCase();
+      if (
+        !ALLOWED_ATTR_SET.has(name as (typeof READER_ALLOWED_ATTR)[number]) ||
+        name.startsWith("on") ||
+        name === "style"
+      ) {
+        element.removeAttribute(attribute.name);
+        continue;
+      }
+
+      if (name === "href" || name === "src") {
+        const safeValue = sanitizeUrlValue(attribute.value);
+        if (!safeValue) {
+          element.removeAttribute(attribute.name);
+        } else {
+          element.setAttribute(attribute.name, safeValue);
+        }
+        continue;
+      }
+
+      if (name === "srcset") {
+        const safeValue = sanitizeSrcSetValue(attribute.value);
+        if (!safeValue) {
+          element.removeAttribute(attribute.name);
+        } else {
+          element.setAttribute(attribute.name, safeValue);
+        }
+        continue;
+      }
+
+      if (name === "width" || name === "height") {
+        const safeValue = sanitizeDimensionValue(attribute.value);
+        if (!safeValue) {
+          element.removeAttribute(attribute.name);
+        } else {
+          element.setAttribute(attribute.name, safeValue);
+        }
+      }
+    }
+
+    if (tagName === "a") {
+      const href = element.getAttribute("href");
+      if (!href) {
+        element.replaceWith(...Array.from(element.childNodes));
+        continue;
+      }
+      if (element.getAttribute("target") === "_blank") {
+        element.setAttribute("rel", "noopener noreferrer");
+      } else {
+        element.removeAttribute("target");
+        element.removeAttribute("rel");
+      }
+    }
+
+    if (tagName === "img") {
+      if (!element.getAttribute("src")) {
+        element.remove();
+        continue;
+      }
+      if (!element.getAttribute("alt")) {
+        element.setAttribute("alt", "");
+      }
+      element.setAttribute("loading", "lazy");
+    }
+  }
+
+  return root.innerHTML;
 }
 
 function highlightSavedWords(

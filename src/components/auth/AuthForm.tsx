@@ -31,7 +31,7 @@ export default function AuthForm() {
     }
 
     if (mode === "signup") {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -40,6 +40,10 @@ export default function AuthForm() {
       });
       if (error) {
         setError(error.message);
+      } else if (data.session) {
+        await getUserWithProfile(supabase);
+        router.push("/");
+        router.refresh();
       } else {
         setMessage("Check your email to confirm your account.");
       }

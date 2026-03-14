@@ -55,9 +55,10 @@ export default async function RootLayout({
           .maybeSingle()
       ).data
     : null;
+  const initialLang = initialSettings?.ui_language === "th" ? "th" : "en";
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={initialLang} suppressHydrationWarning>
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />

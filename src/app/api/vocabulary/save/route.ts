@@ -1,8 +1,12 @@
 import { NextRequest } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { noStoreJson, guardAuthenticatedRequest } from "@/lib/api-guard";
 import { translateSelection } from "@/lib/openai";
 import type { SavedVocabularyPreview, VocabularyLookupResult } from "@/types";
+
+export const runtime = "nodejs";
+export const maxDuration = 30;
 
 const translationSchema = z.object({
   text: z.string().trim().min(1),
@@ -34,6 +38,142 @@ interface SaveVocabularyRpcRow {
   pronunciation: string;
   last_source_name: string;
   context_inserted: boolean;
+}
+
+interface SaveVocabularyFallbackRow {
+  id: string;
+  word: string;
+  thai_meaning: string;
+  english_meaning: string;
+  part_of_speech: string;
+  difficulty: "easy" | "medium" | "hard";
+  pronunciation: string | null;
+  last_source_name: string | null;
+}
+
+function toSavedPreview(row: SaveVocabularyRpcRow | SaveVocabularyFallbackRow): SavedVocabularyPreview {
+  return {
+    id: row.id,
+    word: row.word,
+    thai_meaning: row.thai_meaning,
+    english_meaning: row.english_meaning,
+    part_of_speech: row.part_of_speech,
+    difficulty: row.difficulty,
+    pronunciation: row.pronunciation || row.word,
+    last_source_name: row.last_source_name || undefined,
+  };
+}
+
+async function saveVocabularyFallback({
+  supabase,
+  userId,
+  articleId,
+  articleSourceName,
+  sentence,
+  translation,
+}: {
+  supabase: SupabaseClient;
+  userId: string;
+  articleId: string;
+  articleSourceName: string;
+  sentence: string;
+  translation: VocabularyLookupResult;
+}) {
+  const selectFields =
+    "id, word, thai_meaning, english_meaning, part_of_speech, difficulty, pronunciation, last_source_name";
+  const normalizedWord = translation.text.trim();
+
+  const { data: existingRows, error: existingError } = await supabase
+    .from("vocabulary_items")
+    .select(selectFields)
+    .eq("user_id", userId)
+    .ilike("word", normalizedWord)
+    .limit(1);
+
+  if (existingError) {
+    throw existingError;
+  }
+
+  const existing = (existingRows as SaveVocabularyFallbackRow[] | null)?.[0] ?? null;
+
+  let item: SaveVocabularyFallbackRow | null = null;
+  if (existing) {
+    const { data, error } = await supabase
+      .from("vocabulary_items")
+      .update({
+        thai_meaning: translation.thai_meaning,
+        english_meaning: translation.english_meaning,
+        part_of_speech: translation.part_of_speech,
+        difficulty: translation.difficulty,
+        pronunciation: normalizedWord,
+        last_source_name: articleSourceName,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id)
+      .select(selectFields)
+      .single();
+
+    if (error || !data) {
+      throw error || new Error("Could not update this vocabulary item.");
+    }
+
+    item = data as SaveVocabularyFallbackRow;
+  } else {
+    const { data, error } = await supabase
+      .from("vocabulary_items")
+      .insert({
+        user_id: userId,
+        word: normalizedWord,
+        thai_meaning: translation.thai_meaning,
+        english_meaning: translation.english_meaning,
+        part_of_speech: translation.part_of_speech,
+        difficulty: translation.difficulty,
+        pronunciation: normalizedWord,
+        last_source_name: articleSourceName,
+      })
+      .select(selectFields)
+      .single();
+
+    if (error || !data) {
+      throw error || new Error("Could not create this vocabulary item.");
+    }
+
+    item = data as SaveVocabularyFallbackRow;
+  }
+
+  const { error: reviewStateError } = await supabase.from("review_states").upsert(
+    {
+      user_id: userId,
+      vocabulary_item_id: item.id,
+    },
+    { onConflict: "user_id,vocabulary_item_id" }
+  );
+
+  if (reviewStateError) {
+    throw reviewStateError;
+  }
+
+  let contextInserted = false;
+  if (sentence.trim()) {
+    const { error: contextError } = await supabase.from("vocabulary_contexts").insert({
+      vocabulary_item_id: item.id,
+      article_id: articleId,
+      original_sentence: sentence.trim(),
+      contextual_meaning: translation.contextual_meaning,
+      context_explanation: translation.context_explanation,
+    });
+
+    if (!contextError) {
+      contextInserted = true;
+    } else if (contextError.code !== "23505") {
+      throw contextError;
+    }
+  }
+
+  return {
+    item: toSavedPreview(item),
+    contextInserted,
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -96,28 +236,27 @@ export async function POST(request: NextRequest) {
       })
       .single<SaveVocabularyRpcRow>();
 
-    if (error || !data) {
-      return noStoreJson(
-        { error: error?.message || "Could not save this word right now." },
-        { status: 500 }
-      );
+    if (!error && data) {
+      return noStoreJson({
+        item: toSavedPreview(data),
+        lookup: translationResult,
+        contextInserted: data.context_inserted,
+      });
     }
 
-    const item: SavedVocabularyPreview = {
-      id: data.id,
-      word: data.word,
-      thai_meaning: data.thai_meaning,
-      english_meaning: data.english_meaning,
-      part_of_speech: data.part_of_speech,
-      difficulty: data.difficulty,
-      pronunciation: data.pronunciation,
-      last_source_name: data.last_source_name,
-    };
+    const fallback = await saveVocabularyFallback({
+      supabase: guard.supabase,
+      userId: guard.user.id,
+      articleId: parsed.data.articleId,
+      articleSourceName: parsed.data.articleSourceName,
+      sentence: parsed.data.sentence,
+      translation: translationResult,
+    });
 
     return noStoreJson({
-      item,
+      item: fallback.item,
       lookup: translationResult,
-      contextInserted: data.context_inserted,
+      contextInserted: fallback.contextInserted,
     });
   } catch (error) {
     console.error("Vocabulary save API error:", error);

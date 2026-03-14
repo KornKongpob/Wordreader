@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import { ExternalLink, Loader2, Newspaper, X } from "lucide-react";
 import type { NewsFeedItem } from "@/types";
@@ -28,7 +30,16 @@ export default function NewsPreviewSheet({
   onRead,
   onClose,
 }: NewsPreviewSheetProps) {
-  return (
+  const portalRoot = useMemo(
+    () => (typeof document === "undefined" ? null : document.body),
+    []
+  );
+
+  if (!portalRoot) {
+    return null;
+  }
+
+  return createPortal(
     <>
       <div
         className="fixed inset-0 z-[80] bg-slate-950/32 backdrop-blur-sm"
@@ -115,6 +126,7 @@ export default function NewsPreviewSheet({
           </div>
         </div>
       </div>
-    </>
+    </>,
+    portalRoot
   );
 }

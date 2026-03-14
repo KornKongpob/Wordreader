@@ -284,12 +284,17 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <span className="text-safe-title text-sm">App language</span>
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 flex-1">
+                <span className="text-safe-title text-sm">Language preference</span>
+                <p className="text-safe-meta text-xs text-muted">
+                  Syncs your preferred language across devices while broader UI translation rolls out.
+                </p>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {([
-                  { value: "en", label: "English UI" },
-                  { value: "th", label: "Thai UI" },
+                  { value: "en", label: "Prefer English" },
+                  { value: "th", label: "Prefer Thai" },
                 ] as const).map((option) => (
                   <button
                     key={option.value}
