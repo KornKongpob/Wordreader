@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { guardAuthenticatedRequest, noStoreJson } from "@/lib/api-guard";
 import { extractArticle } from "@/lib/extractor";
+import { validatePublicArticleUrl } from "@/lib/safe-url";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -26,17 +27,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate URL format
-    try {
-      new URL(url);
-    } catch {
-      return noStoreJson(
-        { error: "That doesn't look like a valid URL." },
-        { status: 400 }
-      );
+    const validation = await validatePublicArticleUrl(url);
+    if (!validation.ok) {
+      return noStoreJson({ error: validation.error }, { status: 400 });
     }
 
-    const article = await extractArticle(url);
+    const article = await extractArticle(validation.url);
 
     if (!article) {
       return noStoreJson(

@@ -5,8 +5,10 @@ import { startTransition, useCallback, useDeferredValue, useEffect, useRef, useS
 import { BookMarked, ExternalLink, Loader2, RotateCcw } from "lucide-react";
 import ProfileBootstrap from "@/components/layout/ProfileBootstrap";
 import { useUserSettings } from "@/components/layout/UserSettingsProvider";
+import ArticleGuide from "./ArticleGuide";
 import ArticleNotes from "./ArticleNotes";
 import ArticleQuiz from "./ArticleQuiz";
+import ArticleVocabularySuggestions from "./ArticleVocabularySuggestions";
 import ReaderControls from "./ReaderControls";
 import SavedWordPopup from "./SavedWordPopup";
 import SelectionActionBar from "./SelectionActionBar";
@@ -26,6 +28,11 @@ import {
   sanitizeReaderHtml,
   toSavedWordKey,
 } from "@/lib/reader-html";
+import {
+  estimateDifficultyFromText,
+  estimateReadingMinutes,
+  getPlainWordCount,
+} from "@/lib/readability";
 import { createClient } from "@/lib/supabase/client";
 import { getUserWithProfile } from "@/lib/supabase/ensureProfile";
 import type {
@@ -194,7 +201,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
         supabase
           .from("vocabulary_items")
           .select(
-            "id, word, thai_meaning, english_meaning, part_of_speech, difficulty, pronunciation, last_source_name"
+            "id, word, thai_meaning, english_meaning, part_of_speech, difficulty, lemma, cefr_level, pronunciation, last_source_name"
           )
           .eq("user_id", user.id),
         supabase
@@ -337,6 +344,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
           headers: { "Content-Type": "application/json" },
           signal: controller.signal,
           body: JSON.stringify({
+            articleId: article.id,
             content: article.content,
             articleTitle: article.title,
           }),
@@ -702,6 +710,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
         body: JSON.stringify({
+          articleId: article.id,
           content: article.content,
           articleTitle: article.title,
         }),
@@ -732,6 +741,9 @@ export default function ReaderView({ article }: ReaderViewProps) {
   };
 
   const plainArticleText = getPlainTextFromHtml(article.content);
+  const articleWordCount = getPlainWordCount(plainArticleText);
+  const articleReadingMinutes = estimateReadingMinutes(articleWordCount);
+  const articleDifficulty = estimateDifficultyFromText(plainArticleText);
   const activeSelectionMode = selection
     ? lookupMode === "word"
       ? inferLookupMode(selection, lookupMode)
@@ -777,6 +789,7 @@ export default function ReaderView({ article }: ReaderViewProps) {
         articleSourceName={article.source_name}
         articleText={plainArticleText}
         articleUrl={article.url}
+        preferredAccent={settings.preferredAccent}
         readingProgress={readingProgress}
         readingHelperEnabled={readingHelperEnabled}
         readingHelperLoading={chunkingLoading}
@@ -849,6 +862,15 @@ export default function ReaderView({ article }: ReaderViewProps) {
               </span>
               {article.author && <span className="text-safe-meta">{article.author}</span>}
               {formattedDate && <span className="text-safe-meta">{formattedDate}</span>}
+              <span className="glass-chip rounded-full px-3 py-1 text-xs font-medium text-muted">
+                {articleReadingMinutes} min read
+              </span>
+              <span
+                className="glass-chip rounded-full px-3 py-1 text-xs font-medium text-muted"
+                title={articleDifficulty.reason}
+              >
+                {articleDifficulty.level}
+              </span>
             </div>
 
             <a
@@ -859,6 +881,20 @@ export default function ReaderView({ article }: ReaderViewProps) {
             >
               <span className="chip-truncate">View original</span> <ExternalLink size={12} />
             </a>
+
+            <ArticleGuide
+              articleId={article.id}
+              articleTitle={article.title}
+              content={article.content}
+            />
+            <ArticleVocabularySuggestions
+              articleId={article.id}
+              articleTitle={article.title}
+              articleSourceName={article.source_name}
+              content={plainArticleText}
+              savedVocabulary={savedVocabulary}
+              onSaved={handleWordSaved}
+            />
           </header>
 
           {article.image_url && (

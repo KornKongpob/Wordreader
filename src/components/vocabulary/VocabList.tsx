@@ -13,6 +13,8 @@ interface VocabItem {
   english_meaning: string;
   part_of_speech: string;
   difficulty: "easy" | "medium" | "hard";
+  lemma?: string;
+  cefr_level?: string;
   created_at: string;
   tags?: string[];
   folder_name?: string;
@@ -63,7 +65,7 @@ export default function VocabList() {
         supabase
           .from("vocabulary_items")
           .select(
-            "id, word, thai_meaning, english_meaning, part_of_speech, difficulty, created_at, tags, folder_name, starred, notes, last_source_name"
+            "id, word, thai_meaning, english_meaning, part_of_speech, difficulty, lemma, cefr_level, created_at, tags, folder_name, starred, notes, last_source_name"
           )
           .eq("user_id", user.id)
           .order("created_at", { ascending: false }),
@@ -119,6 +121,7 @@ export default function VocabList() {
       result = result.filter(
         (item) =>
           item.word.toLowerCase().includes(query) ||
+          (item.lemma || "").toLowerCase().includes(query) ||
           item.thai_meaning.toLowerCase().includes(query) ||
           item.english_meaning.toLowerCase().includes(query) ||
           (item.notes || "").toLowerCase().includes(query) ||

@@ -7,6 +7,11 @@ import { BookOpenText, Loader2, Newspaper } from "lucide-react";
 import NewsPreviewSheet from "@/components/news/NewsPreviewSheet";
 import { useArticleImport } from "@/hooks/useArticleImport";
 import { useNewsFeed } from "@/hooks/useNewsFeed";
+import {
+  estimateDifficultyFromText,
+  estimateReadingMinutes,
+  getPlainWordCount,
+} from "@/lib/readability";
 import type { NewsFeedItem } from "@/types";
 
 function formatRelativeTime(value?: string | null) {
@@ -20,6 +25,16 @@ function formatRelativeTime(value?: string | null) {
   return `Updated ${Math.round(diffHours / 24)}d ago`;
 }
 
+function getNewsLearningMeta(item: NewsFeedItem) {
+  const previewText = `${item.title}. ${item.description}`;
+  const wordCount = getPlainWordCount(previewText);
+
+  return {
+    readingMinutes: estimateReadingMinutes(wordCount),
+    difficulty: estimateDifficultyFromText(previewText),
+  };
+}
+
 export default function LatestHeadlines() {
   const { items, loading, error } = useNewsFeed("all");
   const { importing, error: importError, importFromUrl, setError } = useArticleImport();
@@ -27,6 +42,7 @@ export default function LatestHeadlines() {
 
   const featured = items[0] ?? null;
   const latestItems = useMemo(() => items.slice(1, 4), [items]);
+  const featuredMeta = featured ? getNewsLearningMeta(featured) : null;
 
   return (
     <section className="mb-6">
@@ -88,6 +104,19 @@ export default function LatestHeadlines() {
                   {featured.source_name}
                 </span>
                 <span>{formatRelativeTime(featured.published_at)}</span>
+                {featuredMeta && (
+                  <>
+                    <span className="glass-chip rounded-full px-3 py-1 text-muted">
+                      {featuredMeta.readingMinutes} min read
+                    </span>
+                    <span
+                      className="glass-chip rounded-full px-3 py-1 text-muted"
+                      title={featuredMeta.difficulty.reason}
+                    >
+                      {featuredMeta.difficulty.level}
+                    </span>
+                  </>
+                )}
               </div>
               <h3 className="text-safe-title text-xl font-semibold">{featured.title}</h3>
               <p className="text-safe-body mt-2 text-sm text-muted">{featured.description}</p>
@@ -99,25 +128,38 @@ export default function LatestHeadlines() {
           </button>
 
           <div className="grid gap-3 sm:grid-cols-3">
-            {latestItems.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setSelectedItem(item)}
-                className="glass-panel rounded-[1.7rem] p-4 text-left transition hover:-translate-y-0.5"
-              >
-                <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted">
-                  <span className="glass-chip rounded-full px-3 py-1 text-primary">
-                    {item.source_name}
-                  </span>
-                  <span>{formatRelativeTime(item.published_at)}</span>
-                </div>
-                <h3 className="text-safe-title line-clamp-3 font-semibold">{item.title}</h3>
-                <p className="text-safe-body mt-2 line-clamp-3 text-sm text-muted">
-                  {item.description}
-                </p>
-              </button>
-            ))}
+            {latestItems.map((item) => {
+              const meta = getNewsLearningMeta(item);
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setSelectedItem(item)}
+                  className="glass-panel rounded-[1.7rem] p-4 text-left transition hover:-translate-y-0.5"
+                >
+                  <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted">
+                    <span className="glass-chip rounded-full px-3 py-1 text-primary">
+                      {item.source_name}
+                    </span>
+                    <span>{formatRelativeTime(item.published_at)}</span>
+                    <span className="glass-chip rounded-full px-3 py-1 text-muted">
+                      {meta.readingMinutes} min read
+                    </span>
+                    <span
+                      className="glass-chip rounded-full px-3 py-1 text-muted"
+                      title={meta.difficulty.reason}
+                    >
+                      {meta.difficulty.level}
+                    </span>
+                  </div>
+                  <h3 className="text-safe-title line-clamp-3 font-semibold">{item.title}</h3>
+                  <p className="text-safe-body mt-2 line-clamp-3 text-sm text-muted">
+                    {item.description}
+                  </p>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

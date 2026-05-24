@@ -37,6 +37,16 @@ export default function SavedWordPopup({ item, onClose }: SavedWordPopupProps) {
                 <span className="glass-chip rounded-full px-3 py-1 text-xs text-primary">
                   {item.difficulty}
                 </span>
+                {item.cefr_level && (
+                  <span className="glass-chip rounded-full px-3 py-1 text-xs text-primary">
+                    {item.cefr_level}
+                  </span>
+                )}
+                {item.lemma && item.lemma.toLowerCase() !== item.word.toLowerCase() && (
+                  <span className="glass-chip max-w-full rounded-full px-3 py-1 text-xs text-muted">
+                    <span className="chip-truncate">lemma: {item.lemma}</span>
+                  </span>
+                )}
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <SpeakButton

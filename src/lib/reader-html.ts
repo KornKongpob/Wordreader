@@ -13,12 +13,18 @@ function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+const WORD_BOUNDARY_CHAR_CLASS = "\\p{L}\\p{N}_'’\\-";
+
 export function toSavedWordKey(value: string) {
   return normalizeLookupText(value).toLowerCase();
 }
 
 function toIdiomKey(value: string) {
   return normalizeLookupText(value).toLowerCase();
+}
+
+function toSavedWordPattern(value: string) {
+  return escapeRegex(value).replace(/\s+/g, "\\s+");
 }
 
 const ALLOWED_TAG_SET = new Set(READER_ALLOWED_TAGS);
@@ -128,9 +134,14 @@ function highlightSavedWords(
     return content;
   }
 
-  const normalizedWords = [...new Set(savedItems.map((item) => item.word))]
-    .map((word) => normalizeLookupText(word))
-    .filter((word) => word.length >= 3)
+  const normalizedWords = [
+    ...new Map(
+      savedItems
+        .map((item) => normalizeLookupText(item.word))
+        .filter((word) => word.length >= 3)
+        .map((word) => [toSavedWordKey(word), word])
+    ).values(),
+  ]
     .sort((a, b) => b.length - a.length)
     .slice(0, 80);
 
@@ -143,7 +154,12 @@ function highlightSavedWords(
   const root = doc.getElementById("reader-root");
   if (!root) return content;
 
-  const regex = new RegExp(`(${normalizedWords.map(escapeRegex).join("|")})`, "gi");
+  const regex = new RegExp(
+    `(^|[^${WORD_BOUNDARY_CHAR_CLASS}])(${normalizedWords
+      .map(toSavedWordPattern)
+      .join("|")})(?=$|[^${WORD_BOUNDARY_CHAR_CLASS}])`,
+    "giu"
+  );
   const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const nodes: Text[] = [];
 
@@ -172,19 +188,23 @@ function highlightSavedWords(
     const fragment = doc.createDocumentFragment();
     let lastIndex = 0;
 
-    text.replace(regex, (match, _capture, offset) => {
+    text.replace(regex, (fullMatch, prefix: string, matchedWord: string, offset: number) => {
       if (offset > lastIndex) {
         fragment.append(doc.createTextNode(text.slice(lastIndex, offset)));
       }
 
+      if (prefix) {
+        fragment.append(doc.createTextNode(prefix));
+      }
+
       const mark = doc.createElement("mark");
-      const wordKey = toSavedWordKey(match);
+      const wordKey = toSavedWordKey(matchedWord);
       mark.className = wordKey === activeWordKey ? "reader-saved-word is-active" : "reader-saved-word";
       mark.dataset.word = wordKey;
-      mark.textContent = match;
+      mark.textContent = matchedWord;
       fragment.append(mark);
-      lastIndex = offset + match.length;
-      return match;
+      lastIndex = offset + fullMatch.length;
+      return fullMatch;
     });
 
     if (lastIndex < text.length) {

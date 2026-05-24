@@ -1,6 +1,11 @@
 import { extract, extractFromHtml } from "@extractus/article-extractor";
 import { sanitizeReaderHtmlForServer } from "@/lib/reader-html-server";
+import { validatePublicArticleUrl } from "@/lib/safe-url";
 import type { ExtractedArticle } from "@/types";
+
+const MAX_PREFETCH_BYTES = 5 * 1024 * 1024;
+
+class RejectedArticleFetchError extends Error {}
 
 function getFetchOptions(url: string) {
   const headers = {
@@ -20,29 +25,114 @@ function getFetchOptions(url: string) {
   };
 }
 
+function isHtmlContentType(contentType: string | null) {
+  if (!contentType) return true;
+
+  const normalized = contentType.toLowerCase();
+  return (
+    normalized.includes("text/html") ||
+    normalized.includes("application/xhtml+xml")
+  );
+}
+
+function getContentLength(response: Response) {
+  const value = response.headers.get("content-length");
+  if (!value) return null;
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+async function readResponseTextWithLimit(response: Response) {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    return response.text();
+  }
+
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+
+    received += value.byteLength;
+    if (received > MAX_PREFETCH_BYTES) {
+      throw new RejectedArticleFetchError("Article response is too large.");
+    }
+
+    chunks.push(value);
+  }
+
+  const body = new Uint8Array(received);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  return new TextDecoder().decode(body);
+}
+
 async function loadArticleForExtraction(url: string) {
-  const fetchOptions = getFetchOptions(url);
+  const initialValidation = await validatePublicArticleUrl(url);
+  if (!initialValidation.ok) {
+    return { article: null, finalUrl: url };
+  }
+
+  const safeUrl = initialValidation.url;
+  const fetchOptions = getFetchOptions(safeUrl);
 
   try {
-    const response = await fetch(url, {
+    const response = await fetch(safeUrl, {
       headers: fetchOptions.headers,
       signal: fetchOptions.signal,
       redirect: "follow",
     });
 
+    const finalValidation = await validatePublicArticleUrl(
+      response.url || safeUrl
+    );
+    if (!finalValidation.ok) {
+      throw new RejectedArticleFetchError("Redirected URL is not public.");
+    }
+
     if (response.ok) {
-      const html = await response.text();
-      const article = await extractFromHtml(html, response.url || url);
+      if (!isHtmlContentType(response.headers.get("content-type"))) {
+        throw new RejectedArticleFetchError("Article response is not HTML.");
+      }
+
+      const contentLength = getContentLength(response);
+      if (contentLength !== null && contentLength > MAX_PREFETCH_BYTES) {
+        throw new RejectedArticleFetchError("Article response is too large.");
+      }
+
+      const html = await readResponseTextWithLimit(response);
+      const article = await extractFromHtml(html, finalValidation.url);
       if (article?.content) {
-        return { article, finalUrl: response.url || url };
+        return { article, finalUrl: finalValidation.url };
       }
     }
   } catch (error) {
+    if (error instanceof RejectedArticleFetchError) {
+      throw error;
+    }
+
     console.warn("HTML prefetch extraction failed, falling back:", error);
   }
 
-  const article = await extract(url, {}, fetchOptions);
-  return { article, finalUrl: url };
+  const article = await extract(safeUrl, {}, fetchOptions);
+  if (article?.url) {
+    const finalValidation = await validatePublicArticleUrl(article.url);
+    if (!finalValidation.ok) {
+      throw new RejectedArticleFetchError("Extracted URL is not public.");
+    }
+
+    return { article, finalUrl: finalValidation.url };
+  }
+
+  return { article, finalUrl: safeUrl };
 }
 
 export async function extractArticle(

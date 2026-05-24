@@ -41,6 +41,12 @@ export interface VocabularyItem {
   english_meaning: string;
   part_of_speech: string;
   difficulty: "easy" | "medium" | "hard";
+  lemma?: string;
+  cefr_level?: VocabularyCefrLevel;
+  synonyms?: string[];
+  antonyms?: string[];
+  word_family?: VocabularyWordFamilyItem[];
+  collocations?: VocabularyCollocationItem[];
   tags?: string[];
   folder_name?: string;
   starred?: boolean;
@@ -87,6 +93,33 @@ export type LookupIntent = "translate" | "explain";
 export type IdiomDetectionType = "idiom" | "phrasal_verb";
 export type UiLanguage = "en" | "th";
 export type TapBehavior = "word" | "sentence" | "off";
+export type EnglishLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
+export type LearningGoal = "general" | "business" | "exam" | "travel" | "conversation";
+export type PreferredAccent = "us" | "uk" | "au" | "any";
+export type TranslationDensity = "minimal" | "balanced" | "full";
+export type ArticleAiArtifactType = "chunked_html" | "idioms" | "article_guide";
+export type VocabularyCefrLevel = EnglishLevel | "";
+
+export interface VocabularyWordFamilyItem {
+  word: string;
+  part_of_speech?: string;
+  thai_meaning?: string;
+}
+
+export interface VocabularyCollocationItem {
+  phrase: string;
+  thai_meaning?: string;
+  example?: string;
+}
+
+export interface VocabularyEnrichment {
+  lemma: string;
+  cefr_level: VocabularyCefrLevel;
+  synonyms: string[];
+  antonyms: string[];
+  word_family: VocabularyWordFamilyItem[];
+  collocations: VocabularyCollocationItem[];
+}
 
 export interface UserSettings {
   id: string;
@@ -103,6 +136,11 @@ export interface UserSettings {
   default_lookup_intent?: LookupIntent;
   ui_language?: UiLanguage;
   tap_behavior?: TapBehavior;
+  english_level?: EnglishLevel;
+  learning_goal?: LearningGoal;
+  preferred_accent?: PreferredAccent;
+  daily_listening_goal_min?: number;
+  translation_density?: TranslationDensity;
   updated_at: string;
 }
 
@@ -127,6 +165,44 @@ export interface ArticleQuiz {
   user_id: string;
   article_id: string;
   quiz: QuizQuestion[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ArticleGuideVocabularyItem {
+  word: string;
+  thai_meaning: string;
+  simple_english_meaning: string;
+}
+
+export interface ArticleGuide {
+  short_summary_th: string;
+  why_it_matters_th: string;
+  key_vocabulary: ArticleGuideVocabularyItem[];
+  background_context_th: string;
+  reading_goals: string[];
+}
+
+export interface ArticleVocabularySuggestion {
+  word: string;
+  lemma: string;
+  thai_meaning: string;
+  english_meaning: string;
+  part_of_speech: string;
+  cefr_level: VocabularyCefrLevel;
+  difficulty: "easy" | "medium" | "hard";
+  original_sentence: string;
+  why_useful_th: string;
+}
+
+export interface ArticleAiArtifact {
+  id: string;
+  user_id: string;
+  article_id: string;
+  artifact_type: ArticleAiArtifactType;
+  input_hash: string;
+  model: string;
+  payload: unknown;
   created_at: string;
   updated_at: string;
 }
@@ -170,6 +246,8 @@ export interface SavedVocabularyPreview {
   english_meaning: string;
   part_of_speech: string;
   difficulty: "easy" | "medium" | "hard";
+  lemma?: string;
+  cefr_level?: VocabularyCefrLevel;
   pronunciation?: string;
   last_source_name?: string;
 }
@@ -184,6 +262,12 @@ export interface VocabularyLookupResult {
   contextual_meaning: string;
   context_explanation: string;
   difficulty: "easy" | "medium" | "hard";
+  lemma?: string;
+  cefr_level?: VocabularyCefrLevel;
+  synonyms?: string[];
+  antonyms?: string[];
+  word_family?: VocabularyWordFamilyItem[];
+  collocations?: VocabularyCollocationItem[];
 }
 
 export interface SentenceKeyPhrase {

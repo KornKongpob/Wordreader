@@ -1,8 +1,12 @@
 import type {
+  EnglishLevel,
+  LearningGoal,
   LookupIntent,
+  PreferredAccent,
   ReaderLookupStyle,
   TapBehavior,
   ThemeMode,
+  TranslationDensity,
   UiLanguage,
   UserSettings,
 } from "@/types";
@@ -20,6 +24,11 @@ export interface SyncedUserSettings {
   reminderHour: number;
   onboardingCompleted: boolean;
   enableOffline: boolean;
+  englishLevel: EnglishLevel;
+  learningGoal: LearningGoal;
+  preferredAccent: PreferredAccent;
+  dailyListeningGoalMin: number;
+  translationDensity: TranslationDensity;
 }
 
 export const DEFAULT_USER_SETTINGS: SyncedUserSettings = {
@@ -35,10 +44,15 @@ export const DEFAULT_USER_SETTINGS: SyncedUserSettings = {
   reminderHour: 19,
   onboardingCompleted: false,
   enableOffline: true,
+  englishLevel: "B1",
+  learningGoal: "general",
+  preferredAccent: "us",
+  dailyListeningGoalMin: 10,
+  translationDensity: "balanced",
 };
 
 export const USER_SETTINGS_SELECT =
-  "theme, font_size, line_spacing, reader_mode, default_lookup_intent, ui_language, tap_behavior, review_goal, enable_notifications, reminder_hour, onboarding_completed, enable_offline";
+  "theme, font_size, line_spacing, reader_mode, default_lookup_intent, ui_language, tap_behavior, review_goal, enable_notifications, reminder_hour, onboarding_completed, enable_offline, english_level, learning_goal, preferred_accent, daily_listening_goal_min, translation_density";
 
 type NullableUserSettings = Partial<UserSettings> | null | undefined;
 
@@ -68,6 +82,38 @@ function normalizeTapBehavior(value?: string | null): TapBehavior {
   return DEFAULT_USER_SETTINGS.tapBehavior;
 }
 
+function normalizeEnglishLevel(value?: string | null): EnglishLevel {
+  return value === "A1" ||
+    value === "A2" ||
+    value === "B1" ||
+    value === "B2" ||
+    value === "C1" ||
+    value === "C2"
+    ? value
+    : DEFAULT_USER_SETTINGS.englishLevel;
+}
+
+function normalizeLearningGoal(value?: string | null): LearningGoal {
+  return value === "business" ||
+    value === "exam" ||
+    value === "travel" ||
+    value === "conversation"
+    ? value
+    : DEFAULT_USER_SETTINGS.learningGoal;
+}
+
+function normalizePreferredAccent(value?: string | null): PreferredAccent {
+  return value === "uk" || value === "au" || value === "any"
+    ? value
+    : DEFAULT_USER_SETTINGS.preferredAccent;
+}
+
+function normalizeTranslationDensity(value?: string | null): TranslationDensity {
+  return value === "minimal" || value === "full"
+    ? value
+    : DEFAULT_USER_SETTINGS.translationDensity;
+}
+
 function normalizeFontSize(value?: number | null) {
   return typeof value === "number" && value >= 14 && value <= 28
     ? value
@@ -90,6 +136,12 @@ function normalizeReminderHour(value?: number | null) {
   return typeof value === "number" && value >= 0 && value <= 23
     ? value
     : DEFAULT_USER_SETTINGS.reminderHour;
+}
+
+function normalizeDailyListeningGoal(value?: number | null) {
+  return typeof value === "number" && value >= 0 && value <= 180
+    ? value
+    : DEFAULT_USER_SETTINGS.dailyListeningGoalMin;
 }
 
 export function coerceUserSettings(settings?: NullableUserSettings): SyncedUserSettings {
@@ -115,6 +167,11 @@ export function coerceUserSettings(settings?: NullableUserSettings): SyncedUserS
       typeof settings?.enable_offline === "boolean"
         ? settings.enable_offline
         : DEFAULT_USER_SETTINGS.enableOffline,
+    englishLevel: normalizeEnglishLevel(settings?.english_level),
+    learningGoal: normalizeLearningGoal(settings?.learning_goal),
+    preferredAccent: normalizePreferredAccent(settings?.preferred_accent),
+    dailyListeningGoalMin: normalizeDailyListeningGoal(settings?.daily_listening_goal_min),
+    translationDensity: normalizeTranslationDensity(settings?.translation_density),
   };
 }
 
@@ -140,6 +197,15 @@ export function toUserSettingsUpdate(settings: Partial<SyncedUserSettings>) {
   }
   if (typeof settings.enableOffline === "boolean") {
     update.enable_offline = settings.enableOffline;
+  }
+  if (settings.englishLevel) update.english_level = settings.englishLevel;
+  if (settings.learningGoal) update.learning_goal = settings.learningGoal;
+  if (settings.preferredAccent) update.preferred_accent = settings.preferredAccent;
+  if (typeof settings.dailyListeningGoalMin === "number") {
+    update.daily_listening_goal_min = settings.dailyListeningGoalMin;
+  }
+  if (settings.translationDensity) {
+    update.translation_density = settings.translationDensity;
   }
 
   return update;

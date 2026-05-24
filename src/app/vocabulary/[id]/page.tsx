@@ -16,6 +16,12 @@ import {
 import AppShell from "@/components/layout/AppShell";
 import SpeakButton from "@/components/common/SpeakButton";
 import { createClient } from "@/lib/supabase/client";
+import { normalizeVocabularyEnrichment } from "@/lib/vocabulary-enrichment";
+import type {
+  VocabularyCefrLevel,
+  VocabularyCollocationItem,
+  VocabularyWordFamilyItem,
+} from "@/types";
 
 interface VocabDetail {
   id: string;
@@ -24,6 +30,12 @@ interface VocabDetail {
   english_meaning: string;
   part_of_speech: string;
   difficulty: "easy" | "medium" | "hard";
+  lemma?: string;
+  cefr_level?: VocabularyCefrLevel;
+  synonyms?: string[];
+  antonyms?: string[];
+  word_family?: VocabularyWordFamilyItem[];
+  collocations?: VocabularyCollocationItem[];
   created_at: string;
   updated_at: string;
   tags?: string[];
@@ -246,6 +258,16 @@ export default function VocabularyDetailPage() {
   }
 
   const dueNow = reviewState ? new Date(reviewState.next_review_at) <= new Date() : false;
+  const enrichment = normalizeVocabularyEnrichment(item);
+  const showLemma =
+    enrichment.lemma.length > 0 && enrichment.lemma.toLowerCase() !== item.word.toLowerCase();
+  const hasEnrichment =
+    showLemma ||
+    enrichment.cefr_level.length > 0 ||
+    enrichment.collocations.length > 0 ||
+    enrichment.synonyms.length > 0 ||
+    enrichment.antonyms.length > 0 ||
+    enrichment.word_family.length > 0;
 
   return (
     <AppShell>
@@ -279,6 +301,16 @@ export default function VocabularyDetailPage() {
                 >
                   {item.difficulty}
                 </span>
+                {enrichment.cefr_level && (
+                  <span className="glass-chip rounded-full px-3 py-1 text-xs font-medium text-primary">
+                    {enrichment.cefr_level}
+                  </span>
+                )}
+                {showLemma && (
+                  <span className="glass-chip max-w-full rounded-full px-3 py-1 text-xs text-muted">
+                    <span className="chip-truncate">lemma: {enrichment.lemma}</span>
+                  </span>
+                )}
                 {dueNow && (
                   <span className="glass-chip rounded-full px-3 py-1 text-xs font-medium text-primary">
                     Due now
@@ -321,6 +353,114 @@ export default function VocabularyDetailPage() {
             <p className="text-safe-body text-sm">{item.english_meaning}</p>
           </div>
         </div>
+
+        {hasEnrichment && (
+          <section className="glass-panel rounded-[1.75rem] p-4">
+            <p className="editorial-label mb-1">Learning Notes</p>
+            <h2 className="mb-3 font-medium">Extra ways to remember this word</h2>
+
+            {(showLemma || enrichment.cefr_level) && (
+              <div className="mb-3 grid gap-3 sm:grid-cols-2">
+                {showLemma && (
+                  <div className="glass-chip rounded-[1.2rem] px-3 py-3">
+                    <p className="editorial-label">Lemma</p>
+                    <p className="mt-2 text-sm font-medium">{enrichment.lemma}</p>
+                  </div>
+                )}
+                {enrichment.cefr_level && (
+                  <div className="glass-chip rounded-[1.2rem] px-3 py-3">
+                    <p className="editorial-label">CEFR Level</p>
+                    <p className="mt-2 text-sm font-medium">{enrichment.cefr_level}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {enrichment.collocations.length > 0 && (
+              <div className="mb-4">
+                <p className="editorial-label mb-2">Collocations</p>
+                <div className="space-y-2">
+                  {enrichment.collocations.map((collocation) => (
+                    <div
+                      key={`${collocation.phrase}-${collocation.thai_meaning}`}
+                      className="glass-chip rounded-[1.15rem] px-3 py-2"
+                    >
+                      <p className="text-safe-title text-sm font-medium">
+                        {collocation.phrase}
+                      </p>
+                      {collocation.thai_meaning && (
+                        <p className="text-safe-body mt-1 text-sm text-muted">
+                          {collocation.thai_meaning}
+                        </p>
+                      )}
+                      {collocation.example && (
+                        <p className="text-safe-meta mt-1 text-xs text-muted">
+                          {collocation.example}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {(enrichment.synonyms.length > 0 || enrichment.antonyms.length > 0) && (
+              <div className="mb-4 grid gap-3 sm:grid-cols-2">
+                {enrichment.synonyms.length > 0 && (
+                  <div>
+                    <p className="editorial-label mb-2">Synonyms</p>
+                    <div className="flex flex-wrap gap-2">
+                      {enrichment.synonyms.map((synonym) => (
+                        <span
+                          key={synonym}
+                          className="glass-chip rounded-full px-3 py-1 text-xs text-muted"
+                        >
+                          {synonym}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {enrichment.antonyms.length > 0 && (
+                  <div>
+                    <p className="editorial-label mb-2">Antonyms</p>
+                    <div className="flex flex-wrap gap-2">
+                      {enrichment.antonyms.map((antonym) => (
+                        <span
+                          key={antonym}
+                          className="glass-chip rounded-full px-3 py-1 text-xs text-muted"
+                        >
+                          {antonym}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {enrichment.word_family.length > 0 && (
+              <div>
+                <p className="editorial-label mb-2">Word Family</p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {enrichment.word_family.map((familyItem) => (
+                    <div
+                      key={`${familyItem.word}-${familyItem.part_of_speech}`}
+                      className="glass-chip rounded-[1.15rem] px-3 py-2"
+                    >
+                      <p className="text-safe-title text-sm font-medium">{familyItem.word}</p>
+                      <p className="text-safe-meta mt-1 text-xs text-muted">
+                        {[familyItem.part_of_speech, familyItem.thai_meaning]
+                          .filter(Boolean)
+                          .join(" / ")}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
 
         <section className="glass-panel rounded-[1.75rem] p-4">
           <div className="mb-3 flex items-center gap-2">

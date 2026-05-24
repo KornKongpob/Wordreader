@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 import AppShell from "@/components/layout/AppShell";
 import NewsPreviewSheet from "@/components/news/NewsPreviewSheet";
 import { NEWS_SECTIONS } from "@/lib/news-sources";
+import {
+  estimateDifficultyFromText,
+  estimateReadingMinutes,
+  getPlainWordCount,
+} from "@/lib/readability";
 import { useArticleImport } from "@/hooks/useArticleImport";
 import { useNewsFeed } from "@/hooks/useNewsFeed";
 import {
@@ -86,6 +91,16 @@ function getArticleMeta(entry: RecentArticle) {
   return Array.isArray(entry.articles) ? entry.articles[0] : entry.articles;
 }
 
+function getNewsLearningMeta(item: NewsFeedItem) {
+  const previewText = `${item.title}. ${item.description}`;
+  const wordCount = getPlainWordCount(previewText);
+
+  return {
+    readingMinutes: estimateReadingMinutes(wordCount),
+    difficulty: estimateDifficultyFromText(previewText),
+  };
+}
+
 export default function ReadPage() {
   const router = useRouter();
   const [mode, setMode] = useState<ImportMode>("url");
@@ -146,6 +161,7 @@ export default function ReadPage() {
   );
   const featuredStory = newsItems[0] ?? null;
   const topStories = useMemo(() => newsItems.slice(0, 5), [newsItems]);
+  const featuredStoryMeta = featuredStory ? getNewsLearningMeta(featuredStory) : null;
   const isBusy = importing || manualSubmitting;
 
   const handleUrlSubmit = async (event: React.FormEvent) => {
@@ -258,6 +274,19 @@ export default function ReadPage() {
                     {featuredStory.source_name}
                   </span>
                   <span>{formatRelativeTime(featuredStory.published_at)}</span>
+                  {featuredStoryMeta && (
+                    <>
+                      <span className="glass-chip rounded-full px-3 py-1 text-muted">
+                        {featuredStoryMeta.readingMinutes} min read
+                      </span>
+                      <span
+                        className="glass-chip rounded-full px-3 py-1 text-muted"
+                        title={featuredStoryMeta.difficulty.reason}
+                      >
+                        {featuredStoryMeta.difficulty.level}
+                      </span>
+                    </>
+                  )}
                 </div>
                 <h3 className="text-safe-title text-2xl font-semibold">
                   {featuredStory.title}
@@ -272,25 +301,38 @@ export default function ReadPage() {
               </button>
 
               <div className="grid gap-3">
-                {topStories.slice(1).map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setSelectedNewsItem(item)}
-                    className="glass-panel rounded-[1.6rem] p-4 text-left transition hover:-translate-y-0.5"
-                  >
-                    <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted">
-                      <span className="glass-chip rounded-full px-3 py-1 text-primary">
-                        {item.source_name}
-                      </span>
-                      <span>{formatRelativeTime(item.published_at)}</span>
-                    </div>
-                    <h3 className="text-safe-title line-clamp-3 font-semibold">{item.title}</h3>
-                    <p className="text-safe-body mt-2 line-clamp-3 text-sm text-muted">
-                      {item.description}
-                    </p>
-                  </button>
-                ))}
+                {topStories.slice(1).map((item) => {
+                  const meta = getNewsLearningMeta(item);
+
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setSelectedNewsItem(item)}
+                      className="glass-panel rounded-[1.6rem] p-4 text-left transition hover:-translate-y-0.5"
+                    >
+                      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted">
+                        <span className="glass-chip rounded-full px-3 py-1 text-primary">
+                          {item.source_name}
+                        </span>
+                        <span>{formatRelativeTime(item.published_at)}</span>
+                        <span className="glass-chip rounded-full px-3 py-1 text-muted">
+                          {meta.readingMinutes} min read
+                        </span>
+                        <span
+                          className="glass-chip rounded-full px-3 py-1 text-muted"
+                          title={meta.difficulty.reason}
+                        >
+                          {meta.difficulty.level}
+                        </span>
+                      </div>
+                      <h3 className="text-safe-title line-clamp-3 font-semibold">{item.title}</h3>
+                      <p className="text-safe-body mt-2 line-clamp-3 text-sm text-muted">
+                        {item.description}
+                      </p>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

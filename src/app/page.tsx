@@ -1,6 +1,7 @@
 import AppShell from "@/components/layout/AppShell";
 import LatestHeadlines from "@/components/home/LatestHeadlines";
 import OnboardingChecklist from "@/components/home/OnboardingChecklist";
+import { calculateLocalDayStreak, getStartOfLocalToday } from "@/lib/local-date";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import {
@@ -33,43 +34,6 @@ interface ReadingHistoryWithArticle {
         image_url: string | null;
       }[]
     | null;
-}
-
-function getStartOfToday() {
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  return now;
-}
-
-function calculateStreak(reviewedAt: string[]) {
-  const uniqueDays = [...new Set(reviewedAt.map((value) => value.slice(0, 10)))].sort(
-    (a, b) => b.localeCompare(a)
-  );
-
-  if (uniqueDays.length === 0) return 0;
-
-  let streak = 0;
-  const cursor = new Date();
-  cursor.setHours(0, 0, 0, 0);
-
-  for (const day of uniqueDays) {
-    const cursorLabel = cursor.toISOString().slice(0, 10);
-    if (day !== cursorLabel) {
-      if (streak === 0) {
-        cursor.setDate(cursor.getDate() - 1);
-        if (day !== cursor.toISOString().slice(0, 10)) {
-          break;
-        }
-      } else {
-        break;
-      }
-    }
-
-    streak += 1;
-    cursor.setDate(cursor.getDate() - 1);
-  }
-
-  return streak;
 }
 
 function formatRelativeTime(value?: string) {
@@ -105,7 +69,7 @@ export default async function HomePage() {
     );
   }
 
-  const startOfToday = getStartOfToday().toISOString();
+  const startOfToday = getStartOfLocalToday().toISOString();
 
   const [
     { data: settings },
@@ -158,7 +122,7 @@ export default async function HomePage() {
   const recentHistory = [...uniqueHistory.values()];
   const continueReading = recentHistory.filter((row) => !row.is_finished).slice(0, 3);
   const distinctArticleCount = recentHistory.length;
-  const streak = calculateStreak((reviewEventDays ?? []).map((event) => event.reviewed_at));
+  const streak = calculateLocalDayStreak((reviewEventDays ?? []).map((event) => event.reviewed_at));
   const reviewGoal = settings?.review_goal ?? 10;
   const reviewedCount = reviewedToday ?? 0;
   const progress = Math.min(100, Math.round((reviewedCount / reviewGoal) * 100));

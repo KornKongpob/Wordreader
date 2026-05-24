@@ -10,6 +10,8 @@ interface VocabCardProps {
   english_meaning: string;
   part_of_speech: string;
   difficulty: "easy" | "medium" | "hard";
+  lemma?: string;
+  cefr_level?: string;
   created_at: string;
   tags?: string[];
   folder_name?: string;
@@ -25,6 +27,8 @@ export default function VocabCard({
   thai_meaning,
   part_of_speech,
   difficulty,
+  lemma = "",
+  cefr_level = "",
   created_at,
   tags = [],
   folder_name = "General",
@@ -60,6 +64,16 @@ export default function VocabCard({
           </div>
           <p className="text-safe-body line-clamp-2 text-sm text-muted">{thai_meaning}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
+            {cefr_level && (
+              <span className="glass-chip rounded-full px-2 py-1 text-primary">
+                {cefr_level}
+              </span>
+            )}
+            {lemma && lemma.toLowerCase() !== word.toLowerCase() && (
+              <span className="glass-chip max-w-full rounded-full px-2 py-1 text-muted">
+                <span className="chip-truncate">lemma: {lemma}</span>
+              </span>
+            )}
             {due_now && (
               <span className="glass-chip inline-flex items-center gap-1 rounded-full px-2 py-1 text-primary">
                 <RotateCcw size={11} />

@@ -4,6 +4,11 @@ import { useMemo } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { ExternalLink, Loader2, Newspaper, X } from "lucide-react";
+import {
+  estimateDifficultyFromText,
+  estimateReadingMinutes,
+  getPlainWordCount,
+} from "@/lib/readability";
 import type { NewsFeedItem } from "@/types";
 
 interface NewsPreviewSheetProps {
@@ -24,6 +29,16 @@ function formatRelativeTime(value?: string | null) {
   return `Updated ${Math.round(diffHours / 24)}d ago`;
 }
 
+function getNewsLearningMeta(item: NewsFeedItem) {
+  const previewText = `${item.title}. ${item.description}`;
+  const wordCount = getPlainWordCount(previewText);
+
+  return {
+    readingMinutes: estimateReadingMinutes(wordCount),
+    difficulty: estimateDifficultyFromText(previewText),
+  };
+}
+
 export default function NewsPreviewSheet({
   item,
   loading = false,
@@ -34,6 +49,7 @@ export default function NewsPreviewSheet({
     () => (typeof document === "undefined" ? null : document.body),
     []
   );
+  const learningMeta = getNewsLearningMeta(item);
 
   if (!portalRoot) {
     return null;
@@ -62,6 +78,15 @@ export default function NewsPreviewSheet({
                 </span>
                 <span className="glass-chip rounded-full px-3 py-1 text-muted">
                   {formatRelativeTime(item.published_at)}
+                </span>
+                <span className="glass-chip rounded-full px-3 py-1 text-muted">
+                  {learningMeta.readingMinutes} min read
+                </span>
+                <span
+                  className="glass-chip rounded-full px-3 py-1 text-muted"
+                  title={learningMeta.difficulty.reason}
+                >
+                  {learningMeta.difficulty.level}
                 </span>
               </div>
             </div>

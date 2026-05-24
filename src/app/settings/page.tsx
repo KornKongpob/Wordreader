@@ -6,6 +6,9 @@ import {
   Bell,
   BookOpen,
   Cloud,
+  GraduationCap,
+  Headphones,
+  Languages,
   LogOut,
   Minus,
   Monitor,
@@ -122,6 +125,25 @@ export default function SettingsPage() {
     { value: "dark" as const, label: "Dark", icon: Moon },
     { value: "system" as const, label: "System", icon: Monitor },
   ];
+  const englishLevels = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
+  const learningGoals = [
+    { value: "general", label: "General" },
+    { value: "business", label: "Business" },
+    { value: "exam", label: "Exam" },
+    { value: "travel", label: "Travel" },
+    { value: "conversation", label: "Conversation" },
+  ] as const;
+  const accentOptions = [
+    { value: "us", label: "US" },
+    { value: "uk", label: "UK" },
+    { value: "au", label: "AU" },
+    { value: "any", label: "Any" },
+  ] as const;
+  const translationDensityOptions = [
+    { value: "minimal", label: "Minimal" },
+    { value: "balanced", label: "Balanced" },
+    { value: "full", label: "Full" },
+  ] as const;
 
   return (
     <AppShell>
@@ -168,6 +190,158 @@ export default function SettingsPage() {
                 <span className="text-xs font-medium">{label}</span>
               </button>
             ))}
+          </div>
+        </section>
+
+        <section className="mb-8">
+          <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted">
+            Learning profile
+          </h2>
+          <div className="glass-panel space-y-4 rounded-2xl p-4">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 flex-1 items-start gap-2">
+                <GraduationCap size={16} className="mt-0.5 text-primary" />
+                <div className="min-w-0">
+                  <p className="text-safe-title text-sm font-medium">English level</p>
+                  <p className="text-safe-meta text-xs text-muted">
+                    Used later for explanation depth and article difficulty.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {englishLevels.map((level) => (
+                  <button
+                    key={level}
+                    type="button"
+                    onClick={() => void updateSettings({ englishLevel: level })}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                      settings.englishLevel === level
+                        ? "glow-button text-primary-foreground"
+                        : "subtle-button text-muted"
+                    }`}
+                  >
+                    {level}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 flex-1">
+                <p className="text-safe-title text-sm font-medium">Learning goal</p>
+                <p className="text-safe-meta text-xs text-muted">
+                  Helps future recommendations focus on the right vocabulary.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {learningGoals.map((goal) => (
+                  <button
+                    key={goal.value}
+                    type="button"
+                    onClick={() => void updateSettings({ learningGoal: goal.value })}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                      settings.learningGoal === goal.value
+                        ? "glow-button text-primary-foreground"
+                        : "subtle-button text-muted"
+                    }`}
+                  >
+                    {goal.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 flex-1 items-start gap-2">
+                <Headphones size={16} className="mt-0.5 text-primary" />
+                <div className="min-w-0">
+                  <p className="text-safe-title text-sm font-medium">Preferred accent</p>
+                  <p className="text-safe-meta text-xs text-muted">
+                    Sets the target accent for future listening practice.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {accentOptions.map((accent) => (
+                  <button
+                    key={accent.value}
+                    type="button"
+                    onClick={() => void updateSettings({ preferredAccent: accent.value })}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                      settings.preferredAccent === accent.value
+                        ? "glow-button text-primary-foreground"
+                        : "subtle-button text-muted"
+                    }`}
+                  >
+                    {accent.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0 flex-1">
+                <p className="text-safe-title text-sm font-medium">Daily listening goal</p>
+                <p className="text-safe-meta text-xs text-muted">
+                  Minutes of listening practice to aim for each day.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 self-stretch sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() =>
+                    void updateSettings({
+                      dailyListeningGoalMin: Math.max(0, settings.dailyListeningGoalMin - 5),
+                    })
+                  }
+                  className="subtle-button flex h-8 w-8 items-center justify-center rounded-lg text-muted"
+                >
+                  <Minus size={14} />
+                </button>
+                <span className="w-14 text-center text-sm font-medium">
+                  {settings.dailyListeningGoalMin}m
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void updateSettings({
+                      dailyListeningGoalMin: Math.min(120, settings.dailyListeningGoalMin + 5),
+                    })
+                  }
+                  className="subtle-button flex h-8 w-8 items-center justify-center rounded-lg text-muted"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 flex-1 items-start gap-2">
+                <Languages size={16} className="mt-0.5 text-primary" />
+                <div className="min-w-0">
+                  <p className="text-safe-title text-sm font-medium">Translation density</p>
+                  <p className="text-safe-meta text-xs text-muted">
+                    Controls how much Thai support future reading help should provide.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {translationDensityOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => void updateSettings({ translationDensity: option.value })}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                      settings.translationDensity === option.value
+                        ? "glow-button text-primary-foreground"
+                        : "subtle-button text-muted"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
 

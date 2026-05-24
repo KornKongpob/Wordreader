@@ -158,6 +158,12 @@ export default function VocabPopup({
             contextual_meaning: result.contextual_meaning,
             context_explanation: result.context_explanation,
             difficulty: result.difficulty,
+            lemma: result.lemma,
+            cefr_level: result.cefr_level,
+            synonyms: result.synonyms,
+            antonyms: result.antonyms,
+            word_family: result.word_family,
+            collocations: result.collocations,
           },
         }),
       });
@@ -224,6 +230,16 @@ export default function VocabPopup({
         >
           {translation.difficulty}
         </span>
+        {translation.cefr_level && (
+          <span className="glass-chip rounded-full px-3 py-1 text-xs text-primary">
+            {translation.cefr_level}
+          </span>
+        )}
+        {translation.lemma && translation.lemma.toLowerCase() !== translation.text.toLowerCase() && (
+          <span className="glass-chip max-w-full rounded-full px-3 py-1 text-xs text-muted">
+            <span className="chip-truncate">lemma: {translation.lemma}</span>
+          </span>
+        )}
         <span className="glass-chip max-w-full rounded-full px-3 py-1 text-xs text-muted">
           Source:{" "}
           <span className="chip-truncate font-medium text-foreground">{articleSourceName}</span>

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { calculateLocalDayStreak, getStartOfLocalToday } from "@/lib/local-date";
 import { calculateNextReview } from "@/lib/srs";
 import AppShell from "@/components/layout/AppShell";
 import Flashcard from "@/components/review/Flashcard";
@@ -60,43 +61,6 @@ interface ReviewDayRow {
   reviewed_at: string;
 }
 
-function getStartOfToday() {
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  return now;
-}
-
-function calculateStreak(reviewedAt: string[]) {
-  const uniqueDays = [...new Set(reviewedAt.map((value) => value.slice(0, 10)))].sort(
-    (a, b) => b.localeCompare(a)
-  );
-
-  if (uniqueDays.length === 0) return 0;
-
-  let streak = 0;
-  const cursor = new Date();
-  cursor.setHours(0, 0, 0, 0);
-
-  for (const day of uniqueDays) {
-    const expected = cursor.toISOString().slice(0, 10);
-    if (day !== expected) {
-      if (streak === 0) {
-        cursor.setDate(cursor.getDate() - 1);
-        if (day !== cursor.toISOString().slice(0, 10)) {
-          break;
-        }
-      } else {
-        break;
-      }
-    }
-
-    streak += 1;
-    cursor.setDate(cursor.getDate() - 1);
-  }
-
-  return streak;
-}
-
 export default function ReviewPage() {
   const supabase = createClient();
   const [cards, setCards] = useState<ReviewCard[]>([]);
@@ -130,7 +94,7 @@ export default function ReviewPage() {
       }
       userIdRef.current = user.id;
 
-      const startOfToday = getStartOfToday().toISOString();
+      const startOfToday = getStartOfLocalToday().toISOString();
 
       const [{ data: settings }, { count: reviewedCount }, { data: reviewDays }, { data: reviewStates }] =
         await Promise.all([
@@ -164,7 +128,7 @@ export default function ReviewPage() {
       setReviewGoal(settings?.review_goal ?? 10);
       setReviewedToday(reviewedCount ?? 0);
       setStreak(
-        calculateStreak(
+        calculateLocalDayStreak(
           (reviewDays ?? []).map((entry: ReviewDayRow) => entry.reviewed_at)
         )
       );

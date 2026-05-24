@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "@/components/layout/ThemeProvider";
-import type { ReaderLookupStyle } from "@/types";
+import ReaderListeningPanel from "./ReaderListeningPanel";
+import type { PreferredAccent, ReaderLookupStyle } from "@/types";
 import {
   ArrowLeft,
   BookOpenText,
   ExternalLink,
+  Headphones,
   Languages,
   Minus,
   Monitor,
@@ -33,6 +35,7 @@ interface ReaderControlsProps {
   articleSourceName: string;
   articleText: string;
   articleUrl?: string | null;
+  preferredAccent?: PreferredAccent;
   readingProgress: number;
   readingHelperEnabled?: boolean;
   readingHelperLoading?: boolean;
@@ -80,6 +83,7 @@ export default function ReaderControls({
   articleSourceName,
   articleText,
   articleUrl,
+  preferredAccent = "any",
   readingProgress,
   readingHelperEnabled = false,
   readingHelperLoading = false,
@@ -97,6 +101,7 @@ export default function ReaderControls({
 }: ReaderControlsProps) {
   const { theme, setTheme } = useTheme();
   const [showPanel, setShowPanel] = useState(false);
+  const [showListeningPanel, setShowListeningPanel] = useState(false);
   const [panelNotice, setPanelNotice] = useState<string | null>(null);
   const [speechState, setSpeechState] = useState<SpeechState>("idle");
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -147,6 +152,18 @@ export default function ReaderControls({
   }, []);
 
   const canOpenOriginal = Boolean(articleUrl && articleUrl.startsWith("http"));
+
+  const stopWholeArticleSpeech = () => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      return;
+    }
+
+    if (utteranceRef.current || speechState !== "idle") {
+      window.speechSynthesis.cancel();
+      utteranceRef.current = null;
+      setSpeechState("idle");
+    }
+  };
 
   const startReadingAloud = () => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
@@ -358,7 +375,7 @@ export default function ReaderControls({
 
             <div
               className={`grid gap-2 ${
-                onJumpToNotes ? "sm:grid-cols-3" : "sm:grid-cols-2"
+                onJumpToNotes ? "sm:grid-cols-4" : "sm:grid-cols-3"
               }`}
             >
               <button
@@ -390,7 +407,30 @@ export default function ReaderControls({
                 <BookOpenText size={16} />
                 {speechLabel}
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowListeningPanel((current) => !current);
+                  setPanelNotice(null);
+                }}
+                className={`inline-flex min-h-[3rem] items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                  showListeningPanel
+                    ? "glow-button text-primary-foreground"
+                    : "subtle-button text-foreground"
+                }`}
+              >
+                <Headphones size={16} />
+                Listening
+              </button>
             </div>
+
+            {showListeningPanel && (
+              <ReaderListeningPanel
+                articleText={articleText}
+                preferredAccent={preferredAccent}
+                onBeforeSpeak={stopWholeArticleSpeech}
+              />
+            )}
 
             <div>
               <p className="editorial-label mb-2">Theme</p>
