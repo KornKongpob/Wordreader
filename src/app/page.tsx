@@ -1,12 +1,14 @@
 import AppShell from "@/components/layout/AppShell";
 import LatestHeadlines from "@/components/home/LatestHeadlines";
 import OnboardingChecklist from "@/components/home/OnboardingChecklist";
+import { summarizeQuizAttempts } from "@/lib/article-quiz-attempts";
 import { calculateLocalDayStreak, getStartOfLocalToday } from "@/lib/local-date";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import {
   BookOpen,
   BookOpenText,
+  Brain,
   Flame,
   Library,
   RotateCcw,
@@ -78,6 +80,7 @@ export default async function HomePage() {
     { count: vocabCount },
     { data: reviewEventDays },
     { data: readingHistory },
+    { data: quizAttempts },
   ] = await Promise.all([
     supabase
       .from("user_settings")
@@ -110,6 +113,12 @@ export default async function HomePage() {
       .eq("user_id", user.id)
       .order("updated_at", { ascending: false })
       .limit(8),
+    supabase
+      .from("article_quiz_attempts")
+      .select("score, total")
+      .eq("user_id", user.id)
+      .order("completed_at", { ascending: false })
+      .limit(200),
   ]);
 
   const uniqueHistory = new Map<string, ReadingHistoryWithArticle>();
@@ -126,6 +135,7 @@ export default async function HomePage() {
   const reviewGoal = settings?.review_goal ?? 10;
   const reviewedCount = reviewedToday ?? 0;
   const progress = Math.min(100, Math.round((reviewedCount / reviewGoal) * 100));
+  const quizSummary = summarizeQuizAttempts((quizAttempts ?? []) as { score: number; total: number }[]);
 
   const onboardingItems = [
     { label: "Read your first article", done: distinctArticleCount > 0 },
@@ -185,6 +195,22 @@ export default async function HomePage() {
             <p className="editorial-label">Articles</p>
             <p className="mt-2 text-2xl font-bold">{distinctArticleCount}</p>
             <p className="mt-1 text-xs text-muted">Distinct pieces you&apos;ve read</p>
+          </div>
+          <div className="glass-panel col-span-2 rounded-2xl p-4">
+            <div className="mb-2 flex items-center gap-2 text-primary">
+              <Brain size={16} />
+              <p className="editorial-label">Comprehension</p>
+            </div>
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <p className="text-2xl font-bold">{quizSummary.completed}</p>
+                <p className="mt-1 text-xs text-muted">Quizzes completed</p>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-bold">{quizSummary.averagePercent}%</p>
+                <p className="mt-1 text-xs text-muted">Average score</p>
+              </div>
+            </div>
           </div>
         </section>
 

@@ -169,6 +169,34 @@ export interface ArticleQuiz {
   updated_at: string;
 }
 
+export interface ArticleQuizAttemptAnswer {
+  question_index: number;
+  selected_option_index: number;
+  correct_option_index: number;
+  is_correct: boolean;
+}
+
+export interface ArticleQuizAttempt {
+  id: string;
+  user_id: string;
+  article_id: string;
+  article_quiz_id: string | null;
+  score: number;
+  total: number;
+  answers: ArticleQuizAttemptAnswer[];
+  completed_at: string;
+}
+
+export interface ArticleQuizAttemptInsert {
+  user_id: string;
+  article_id: string;
+  article_quiz_id: string | null;
+  score: number;
+  total: number;
+  answers: ArticleQuizAttemptAnswer[];
+  completed_at?: string;
+}
+
 export interface ArticleGuideVocabularyItem {
   word: string;
   thai_meaning: string;
@@ -348,4 +376,6 @@ export interface DashboardStats {
   vocabCount: number;
   distinctArticleCount: number;
   streak: number;
+  quizAttemptsCompleted?: number;
+  averageQuizScorePercent?: number;
 }

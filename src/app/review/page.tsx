@@ -3,11 +3,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { calculateLocalDayStreak, getStartOfLocalToday } from "@/lib/local-date";
-import { calculateNextReview } from "@/lib/srs";
+import {
+  prepareReviewSyncPayload,
+  type PreparedReviewSyncPayload,
+} from "@/lib/review-sync";
+import type { ReviewRating } from "@/lib/srs";
 import AppShell from "@/components/layout/AppShell";
+import ClozeReview from "@/components/review/ClozeReview";
 import Flashcard from "@/components/review/Flashcard";
+import ListeningReview from "@/components/review/ListeningReview";
+import ReviewModeSelector from "@/components/review/ReviewModeSelector";
+import TypingReview from "@/components/review/TypingReview";
+import type { ReviewMode } from "@/components/review/types";
 import { getOfflineReviewDeck, saveOfflineReviewDeck } from "@/lib/offline";
-import { Flame, Loader2, PartyPopper, RotateCcw, Target } from "lucide-react";
+import { AlertCircle, Flame, Loader2, PartyPopper, RotateCcw, Target } from "lucide-react";
 import Link from "next/link";
 
 interface ReviewCard {
@@ -61,6 +70,12 @@ interface ReviewDayRow {
   reviewed_at: string;
 }
 
+interface FailedReviewSync extends PreparedReviewSyncPayload {
+  id: string;
+  word: string;
+  errorMessage: string;
+}
+
 export default function ReviewPage() {
   const supabase = createClient();
   const [cards, setCards] = useState<ReviewCard[]>([]);
@@ -72,6 +87,12 @@ export default function ReviewPage() {
   const [streak, setStreak] = useState(0);
   const [offlineSession, setOfflineSession] = useState(false);
   const [sessionReviewed, setSessionReviewed] = useState(0);
+  const [, setReviewedAtHistory] = useState<string[]>([]);
+  const [ratingBusy, setRatingBusy] = useState(false);
+  const [syncNotice, setSyncNotice] = useState("");
+  const [syncError, setSyncError] = useState("");
+  const [failedSyncs, setFailedSyncs] = useState<FailedReviewSync[]>([]);
+  const [reviewMode, setReviewMode] = useState<ReviewMode>("flashcard");
   const userIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -80,6 +101,11 @@ export default function ReviewPage() {
         const cachedDeck = getOfflineReviewDeck().cards;
         setCards(cachedDeck as ReviewCard[]);
         setOfflineSession(cachedDeck.length > 0);
+        if (cachedDeck.length > 0) {
+          setSyncNotice(
+            "Offline cached review is available. Ratings move this session forward only and do not sync your schedule yet."
+          );
+        }
         setLoading(false);
         return;
       }
@@ -127,11 +153,11 @@ export default function ReviewPage() {
 
       setReviewGoal(settings?.review_goal ?? 10);
       setReviewedToday(reviewedCount ?? 0);
-      setStreak(
-        calculateLocalDayStreak(
-          (reviewDays ?? []).map((entry: ReviewDayRow) => entry.reviewed_at)
-        )
+      const reviewHistory = (reviewDays ?? []).map(
+        (entry: ReviewDayRow) => entry.reviewed_at
       );
+      setReviewedAtHistory(reviewHistory);
+      setStreak(calculateLocalDayStreak(reviewHistory));
 
       if (!reviewStates || reviewStates.length === 0) {
         setCards([]);
@@ -173,54 +199,193 @@ export default function ReviewPage() {
     void fetchReviewData();
   }, [supabase]);
 
-  const handleRate = async (rating: "again" | "easy" | "medium" | "hard") => {
-    const card = cards[currentIndex];
-    if (!card) return;
-
+  const applyLocalReviewProgress = (reviewedAt: string) => {
     setReviewedToday((current) => current + 1);
     setSessionReviewed((current) => current + 1);
+    setReviewedAtHistory((current) => {
+      const next = [reviewedAt, ...current];
+      setStreak(calculateLocalDayStreak(next));
+      return next;
+    });
 
     if (currentIndex + 1 < cards.length) {
       setCurrentIndex(currentIndex + 1);
     } else {
       setFinished(true);
     }
+  };
 
-    const userId = userIdRef.current;
-    if (!supabase || !userId) return;
+  const getReviewSyncErrorMessage = (error: unknown) => {
+    return error instanceof Error ? error.message : "Review sync failed.";
+  };
 
-    const update = calculateNextReview(
-      {
-        ease_factor: card.ease_factor,
-        interval_days: card.interval_days,
-        repetitions: card.repetitions,
-      },
-      rating
-    );
+  const syncPreparedReview = async (payload: PreparedReviewSyncPayload) => {
+    if (!supabase) {
+      throw new Error("Supabase is unavailable.");
+    }
 
-    void Promise.all([
-      supabase
-        .from("review_states")
-        .update({
-          ease_factor: update.ease_factor,
-          interval_days: update.interval_days,
-          repetitions: update.repetitions,
-          next_review_at: update.next_review_at,
-          last_reviewed_at: new Date().toISOString(),
-        })
-        .eq("id", card.review_state_id),
-      supabase.from("review_events").insert({
-        user_id: userId,
-        vocabulary_item_id: card.vocabulary_item_id,
-        rating,
-      }),
+    const { error: stateError } = await supabase
+      .from("review_states")
+      .update(payload.reviewStateUpdate)
+      .eq("id", payload.reviewStateId)
+      .select("id")
+      .single();
+
+    if (stateError) {
+      throw stateError;
+    }
+
+    const { error: eventError } = await supabase
+      .from("review_events")
+      .insert(payload.reviewEventInsert)
+      .select("id")
+      .single();
+
+    if (eventError && eventError.code !== "23505") {
+      throw eventError;
+    }
+  };
+
+  const queueFailedSync = (
+    payload: PreparedReviewSyncPayload,
+    card: ReviewCard,
+    error: unknown
+  ) => {
+    const failedSync: FailedReviewSync = {
+      ...payload,
+      id: `${card.vocabulary_item_id}-${payload.reviewedAt}`,
+      word: card.word,
+      errorMessage: getReviewSyncErrorMessage(error),
+    };
+
+    setFailedSyncs((current) => [
+      failedSync,
+      ...current.filter((item) => item.id !== failedSync.id),
     ]);
+    setSyncError(
+      `Could not sync "${card.word}". Your session moved forward, but its schedule and review event still need syncing.`
+    );
+  };
+
+  const retryFailedSync = async (failedSync: FailedReviewSync) => {
+    if (ratingBusy) return;
+
+    setRatingBusy(true);
+    setSyncError("");
+    setSyncNotice("Syncing pending review...");
+
+    try {
+      await syncPreparedReview(failedSync);
+      setFailedSyncs((current) => current.filter((item) => item.id !== failedSync.id));
+      setSyncNotice(`Synced "${failedSync.word}".`);
+    } catch (error) {
+      setFailedSyncs((current) =>
+        current.map((item) =>
+          item.id === failedSync.id
+            ? { ...item, errorMessage: getReviewSyncErrorMessage(error) }
+            : item
+        )
+      );
+      setSyncError(`Still could not sync "${failedSync.word}". Please try again.`);
+    } finally {
+      setRatingBusy(false);
+    }
+  };
+
+  const handleRate = async (rating: ReviewRating) => {
+    if (ratingBusy) return;
+
+    const card = cards[currentIndex];
+    if (!card) return;
+
+    setRatingBusy(true);
+    setSyncError("");
+    setSyncNotice("");
+    const userId = userIdRef.current;
+    const reviewedAt = new Date().toISOString();
+
+    if (!supabase || !userId) {
+      applyLocalReviewProgress(reviewedAt);
+      setOfflineSession(true);
+      setSyncNotice(
+        "Offline cached review moved locally. This does not sync your review schedule yet."
+      );
+      setRatingBusy(false);
+      return;
+    }
+
+    const payload = prepareReviewSyncPayload({
+      card,
+      rating,
+      userId,
+      reviewedAt,
+    });
+
+    applyLocalReviewProgress(payload.reviewedAt);
+
+    try {
+      await syncPreparedReview(payload);
+      setSyncNotice("Review synced.");
+    } catch (error) {
+      queueFailedSync(payload, card, error);
+    } finally {
+      setRatingBusy(false);
+    }
   };
 
   const goalProgress = useMemo(
     () => Math.min(100, Math.round((reviewedToday / reviewGoal) * 100)),
     [reviewGoal, reviewedToday]
   );
+
+  const syncStatusPanel =
+    syncError || syncNotice || failedSyncs.length > 0 ? (
+      <div className="glass-panel mb-4 space-y-3 rounded-[1.4rem] px-4 py-3">
+        {syncError && (
+          <div className="flex items-start gap-2 text-sm text-danger">
+            <AlertCircle size={16} className="mt-0.5 shrink-0" />
+            <p className="text-safe-body">{syncError}</p>
+          </div>
+        )}
+        {!syncError && syncNotice && (
+          <div className="flex items-start gap-2 text-sm text-muted">
+            {ratingBusy ? (
+              <Loader2 size={16} className="mt-0.5 shrink-0 animate-spin" />
+            ) : (
+              <RotateCcw size={16} className="mt-0.5 shrink-0" />
+            )}
+            <p className="text-safe-body">{syncNotice}</p>
+          </div>
+        )}
+        {failedSyncs.length > 0 && (
+          <div className="space-y-2">
+            <p className="editorial-label">Pending Sync</p>
+            {failedSyncs.map((failedSync) => (
+              <div
+                key={failedSync.id}
+                className="glass-chip flex flex-col gap-2 rounded-xl px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="min-w-0">
+                  <p className="text-safe-title text-sm font-medium">{failedSync.word}</p>
+                  <p className="text-safe-meta text-xs text-muted">
+                    {failedSync.errorMessage}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void retryFailedSync(failedSync)}
+                  disabled={ratingBusy}
+                  className="subtle-button inline-flex min-h-[2.25rem] items-center justify-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium disabled:cursor-wait disabled:opacity-60"
+                >
+                  {ratingBusy ? <Loader2 size={12} className="animate-spin" /> : null}
+                  Retry
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    ) : null;
 
   if (loading) {
     return (
@@ -236,7 +401,7 @@ export default function ReviewPage() {
     return (
       <AppShell>
         <div className="mx-auto max-w-lg px-5 py-6">
-          <h1 className="mb-2 text-xl font-bold">Review Flashcards</h1>
+          <h1 className="mb-2 text-xl font-bold">Review Practice</h1>
           <div className="glass-panel mb-6 rounded-2xl p-4">
             <div className="mb-2 flex items-center gap-2 text-sm text-primary">
               <Target size={16} />
@@ -296,6 +461,7 @@ export default function ReviewPage() {
             <p className="mb-6 text-sm text-muted">
               You reviewed {sessionReviewed} card{sessionReviewed !== 1 ? "s" : ""} this session and reached {reviewedToday}/{reviewGoal} for today.
             </p>
+            {syncStatusPanel}
             <div className="glass-panel mb-6 rounded-2xl p-4 text-left">
               <div className="mb-2 flex items-center gap-2 text-sm text-primary">
                 <Flame size={16} />
@@ -324,13 +490,26 @@ export default function ReviewPage() {
   }
 
   const card = cards[currentIndex];
+  const reviewPracticeProps = {
+    word: card.word,
+    thai_meaning: card.thai_meaning,
+    english_meaning: card.english_meaning,
+    part_of_speech: card.part_of_speech,
+    example_sentence: card.example_sentence,
+    contextual_meaning: card.contextual_meaning,
+    onRate: handleRate,
+    current: currentIndex + 1,
+    total: cards.length,
+    ratingBusy,
+    ratingStatus: ratingBusy ? "Syncing..." : "",
+  };
 
   return (
     <AppShell>
       <div className="mx-auto max-w-lg px-5 py-6">
         <div className="glass-hero mb-6 rounded-[2rem] p-5">
           <p className="editorial-label mb-2">Review Studio</p>
-          <h1 className="text-xl font-bold">Review Flashcards</h1>
+          <h1 className="text-xl font-bold">Review Practice</h1>
           <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
             <div className="glass-panel rounded-2xl px-3 py-3">
               <p className="editorial-label">Due now</p>
@@ -353,23 +532,42 @@ export default function ReviewPage() {
           </div>
           {offlineSession && (
             <p className="text-safe-body mt-3 text-xs text-muted">
-              Working from your cached deck. Ratings move this session forward, but only online sessions sync your schedule.
+              Working from your cached deck. Ratings move this session forward, but they do not sync review events or schedule changes yet.
             </p>
           )}
+          <ReviewModeSelector
+            selectedMode={reviewMode}
+            onChange={setReviewMode}
+            disabled={ratingBusy}
+          />
         </div>
 
-        <Flashcard
-          key={card.vocabulary_item_id}
-          word={card.word}
-          thai_meaning={card.thai_meaning}
-          english_meaning={card.english_meaning}
-          part_of_speech={card.part_of_speech}
-          example_sentence={card.example_sentence}
-          contextual_meaning={card.contextual_meaning}
-          onRate={handleRate}
-          current={currentIndex + 1}
-          total={cards.length}
-        />
+        {syncStatusPanel}
+
+        {reviewMode === "flashcard" && (
+          <Flashcard
+            key={`flashcard-${card.vocabulary_item_id}`}
+            {...reviewPracticeProps}
+          />
+        )}
+        {reviewMode === "typing" && (
+          <TypingReview
+            key={`typing-${card.vocabulary_item_id}`}
+            {...reviewPracticeProps}
+          />
+        )}
+        {reviewMode === "cloze" && (
+          <ClozeReview
+            key={`cloze-${card.vocabulary_item_id}`}
+            {...reviewPracticeProps}
+          />
+        )}
+        {reviewMode === "listening" && (
+          <ListeningReview
+            key={`listening-${card.vocabulary_item_id}`}
+            {...reviewPracticeProps}
+          />
+        )}
       </div>
     </AppShell>
   );

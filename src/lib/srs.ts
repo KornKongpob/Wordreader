@@ -12,9 +12,9 @@ interface ReviewUpdate extends ReviewState {
   next_review_at: string;
 }
 
-type Rating = "again" | "easy" | "medium" | "hard";
+export type ReviewRating = "again" | "easy" | "medium" | "hard";
 
-const RATING_SCORES: Record<Rating, number> = {
+const RATING_SCORES: Record<ReviewRating, number> = {
   again: 1,
   hard: 0,
   medium: 3,
@@ -23,7 +23,7 @@ const RATING_SCORES: Record<Rating, number> = {
 
 export function calculateNextReview(
   current: ReviewState,
-  rating: Rating
+  rating: ReviewRating
 ): ReviewUpdate {
   const score = RATING_SCORES[rating];
   let { ease_factor, interval_days, repetitions } = current;

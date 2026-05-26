@@ -1,10 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Brain, CheckCircle2, Loader2 } from "lucide-react";
+import { Brain, CheckCircle2, History, Loader2, Save } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getUserWithProfile } from "@/lib/supabase/ensureProfile";
-import type { QuizQuestion } from "@/types";
+import {
+  buildArticleQuizAttemptPayload,
+  getQuizScore,
+} from "@/lib/article-quiz-attempts";
+import type { ArticleQuizAttempt, QuizQuestion } from "@/types";
 
 interface ArticleQuizProps {
   articleId: string;
@@ -21,6 +25,10 @@ export default function ArticleQuiz({
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Record<number, number>>({});
   const [error, setError] = useState("");
+  const [articleQuizId, setArticleQuizId] = useState<string | null>(null);
+  const [attempts, setAttempts] = useState<ArticleQuizAttempt[]>([]);
+  const [savingAttempt, setSavingAttempt] = useState(false);
+  const [attemptStatus, setAttemptStatus] = useState("");
 
   useEffect(() => {
     const loadSavedQuiz = async () => {
@@ -31,16 +39,28 @@ export default function ArticleQuiz({
 
       if (!user) return;
 
-      const { data } = await supabase
-        .from("article_quizzes")
-        .select("quiz")
-        .eq("user_id", user.id)
-        .eq("article_id", articleId)
-        .maybeSingle();
+      const [{ data: quizData }, { data: attemptData }] = await Promise.all([
+        supabase
+          .from("article_quizzes")
+          .select("id, quiz")
+          .eq("user_id", user.id)
+          .eq("article_id", articleId)
+          .maybeSingle(),
+        supabase
+          .from("article_quiz_attempts")
+          .select("id, user_id, article_id, article_quiz_id, score, total, answers, completed_at")
+          .eq("user_id", user.id)
+          .eq("article_id", articleId)
+          .order("completed_at", { ascending: false })
+          .limit(5),
+      ]);
 
-      if (Array.isArray(data?.quiz) && data.quiz.length > 0) {
-        setQuestions(data.quiz as QuizQuestion[]);
+      if (Array.isArray(quizData?.quiz) && quizData.quiz.length > 0) {
+        setArticleQuizId(quizData.id);
+        setQuestions(quizData.quiz as QuizQuestion[]);
       }
+
+      setAttempts((attemptData ?? []) as ArticleQuizAttempt[]);
     };
 
     void loadSavedQuiz();
@@ -67,24 +87,31 @@ export default function ArticleQuiz({
       const nextQuestions = data.questions || [];
       setQuestions(nextQuestions);
       setSelected({});
+      setAttemptStatus("");
 
       const supabase = createClient();
       if (supabase) {
         const { user, error: userError } = await getUserWithProfile(supabase);
 
         if (user) {
-          const { error: saveError } = await supabase.from("article_quizzes").upsert(
-            {
-              user_id: user.id,
-              article_id: articleId,
-              quiz: nextQuestions,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "user_id,article_id" }
-          );
+          const { data: savedQuiz, error: saveError } = await supabase
+            .from("article_quizzes")
+            .upsert(
+              {
+                user_id: user.id,
+                article_id: articleId,
+                quiz: nextQuestions,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: "user_id,article_id" }
+            )
+            .select("id")
+            .single();
 
           if (saveError) {
             setError(saveError.message);
+          } else if (savedQuiz?.id) {
+            setArticleQuizId(savedQuiz.id);
           }
         } else if (userError && userError !== "Please sign in again.") {
           setError(userError);
@@ -97,10 +124,61 @@ export default function ArticleQuiz({
     setLoading(false);
   };
 
+  const handleSaveAttempt = async () => {
+    if (savingAttempt || questions.length === 0) return;
+
+    setSavingAttempt(true);
+    setError("");
+    setAttemptStatus("");
+
+    try {
+      const supabase = createClient();
+      if (!supabase) {
+        setError("Could not save this attempt while offline.");
+        return;
+      }
+
+      const { user, error: userError } = await getUserWithProfile(supabase);
+      if (!user) {
+        setError(userError || "Please sign in again to save this attempt.");
+        return;
+      }
+
+      const payload = buildArticleQuizAttemptPayload({
+        userId: user.id,
+        articleId,
+        articleQuizId,
+        questions,
+        selectedAnswers: selected,
+      });
+
+      const { data, error: saveError } = await supabase
+        .from("article_quiz_attempts")
+        .insert(payload)
+        .select("id, user_id, article_id, article_quiz_id, score, total, answers, completed_at")
+        .single();
+
+      if (saveError) {
+        setError(saveError.message);
+        return;
+      }
+
+      if (data) {
+        setAttempts((current) => [data as ArticleQuizAttempt, ...current].slice(0, 5));
+      }
+      setAttemptStatus("Attempt saved.");
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error ? saveError.message : "Could not save this attempt."
+      );
+    } finally {
+      setSavingAttempt(false);
+    }
+  };
+
   const answered = Object.keys(selected).length;
-  const score = questions.reduce((total, question, index) => {
-    return total + (selected[index] === question.answer_index ? 1 : 0);
-  }, 0);
+  const score = getQuizScore(questions, selected);
+  const allAnswered = questions.length > 0 && answered === questions.length;
 
   return (
     <section className="glass-panel mt-8 rounded-2xl p-4">
@@ -187,6 +265,71 @@ export default function ArticleQuiz({
               </div>
             );
           })}
+          {allAnswered && (
+            <div className="glass-panel rounded-2xl p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-safe-title text-sm font-medium">
+                    Final score: {score}/{questions.length}
+                  </p>
+                  <p className="text-safe-meta mt-1 text-xs text-muted">
+                    Save this result to track comprehension over time.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleSaveAttempt()}
+                  disabled={savingAttempt}
+                  className="glow-button inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-primary-foreground disabled:cursor-wait disabled:opacity-60"
+                >
+                  {savingAttempt ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Save size={16} />
+                  )}
+                  Save attempt
+                </button>
+              </div>
+              {attemptStatus && (
+                <p className="mt-3 rounded-xl bg-success/10 px-3 py-2 text-sm text-success">
+                  {attemptStatus}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {attempts.length > 0 && (
+        <div className="mt-5 rounded-2xl border border-border bg-background/40 p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <History size={16} className="text-primary" />
+            <h3 className="text-safe-title text-sm font-medium">Previous attempts</h3>
+          </div>
+          <div className="space-y-2">
+            {attempts.map((attempt) => {
+              const percent = Math.round((attempt.score / attempt.total) * 100);
+
+              return (
+                <div
+                  key={attempt.id}
+                  className="glass-chip flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm"
+                >
+                  <span className="text-safe-body font-medium">
+                    {attempt.score}/{attempt.total} ({percent}%)
+                  </span>
+                  <span className="text-safe-meta text-xs text-muted">
+                    {new Date(attempt.completed_at).toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </section>

@@ -3,18 +3,9 @@
 import { useState, type KeyboardEvent } from "react";
 import { RotateCcw } from "lucide-react";
 import SpeakButton from "@/components/common/SpeakButton";
-
-interface FlashcardProps {
-  word: string;
-  thai_meaning: string;
-  english_meaning: string;
-  part_of_speech: string;
-  example_sentence: string;
-  contextual_meaning: string;
-  onRate: (rating: "again" | "easy" | "medium" | "hard") => void;
-  current: number;
-  total: number;
-}
+import ReviewProgress from "./ReviewProgress";
+import ReviewRatingControls from "./ReviewRatingControls";
+import type { ReviewPracticeProps } from "./types";
 
 export default function Flashcard({
   word,
@@ -26,10 +17,13 @@ export default function Flashcard({
   onRate,
   current,
   total,
-}: FlashcardProps) {
+  ratingBusy = false,
+  ratingStatus = "",
+}: ReviewPracticeProps) {
   const [flipped, setFlipped] = useState(false);
 
   const handleFlip = () => {
+    if (ratingBusy) return;
     setFlipped((current) => !current);
   };
 
@@ -42,24 +36,17 @@ export default function Flashcard({
 
   return (
     <div className="flex w-full flex-col items-center gap-6">
-      <div className="flex w-full items-center gap-3">
-        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-primary/10">
-          <div
-            className="h-full rounded-full bg-primary transition-all duration-300"
-            style={{ width: `${(current / total) * 100}%` }}
-          />
-        </div>
-        <span className="shrink-0 text-xs text-muted">
-          {current}/{total}
-        </span>
-      </div>
+      <ReviewProgress current={current} total={total} />
 
       <div
         role="button"
         tabIndex={0}
         onClick={handleFlip}
         onKeyDown={handleFlipKeyDown}
-        className="glass-panel-strong flex min-h-[320px] w-full cursor-pointer flex-col items-center justify-center rounded-[2rem] p-6 text-center transition-transform active:scale-[0.99]"
+        aria-disabled={ratingBusy}
+        className={`glass-panel-strong flex min-h-[320px] w-full flex-col items-center justify-center rounded-[2rem] p-6 text-center transition-transform active:scale-[0.99] ${
+          ratingBusy ? "cursor-wait opacity-80" : "cursor-pointer"
+        }`}
       >
         {!flipped ? (
           <>
@@ -101,44 +88,12 @@ export default function Flashcard({
       </div>
 
       {flipped && (
-        <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-4">
-          <button
-            onClick={() => {
-              setFlipped(false);
-              onRate("again");
-            }}
-            className="subtle-button flex min-h-[3.25rem] items-center justify-center rounded-xl px-3 py-3 text-center text-sm font-medium text-foreground transition active:scale-[0.97]"
-          >
-            Again today
-          </button>
-          <button
-            onClick={() => {
-              setFlipped(false);
-              onRate("hard");
-            }}
-            className="glass-chip flex min-h-[3.25rem] items-center justify-center rounded-xl px-3 py-3 text-center text-sm font-medium text-danger transition active:scale-[0.97]"
-          >
-            Hard
-          </button>
-          <button
-            onClick={() => {
-              setFlipped(false);
-              onRate("medium");
-            }}
-            className="glass-chip flex min-h-[3.25rem] items-center justify-center rounded-xl px-3 py-3 text-center text-sm font-medium text-warning transition active:scale-[0.97]"
-          >
-            Medium
-          </button>
-          <button
-            onClick={() => {
-              setFlipped(false);
-              onRate("easy");
-            }}
-            className="glass-chip flex min-h-[3.25rem] items-center justify-center rounded-xl px-3 py-3 text-center text-sm font-medium text-success transition active:scale-[0.97]"
-          >
-            Easy
-          </button>
-        </div>
+        <ReviewRatingControls
+          onRate={onRate}
+          ratingBusy={ratingBusy}
+          ratingStatus={ratingStatus}
+          onBeforeRate={() => setFlipped(false)}
+        />
       )}
     </div>
   );
